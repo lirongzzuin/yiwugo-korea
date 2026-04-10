@@ -1,12 +1,21 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useUIStore } from '@/stores/ui-store';
+import { useCartStore } from '@/stores/cart-store';
+import { useAuthStore } from '@/stores/auth-store';
 import SearchBar from './SearchBar';
 
 export default function MobileHeader() {
   const { isMobileMenuOpen, setMobileMenuOpen, isSearchOpen, setSearchOpen } =
     useUIStore();
+  const cartTotal = useCartStore((s) => s.totalItems());
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const user = useAuthStore((s) => s.user);
+
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   return (
     <>
@@ -52,6 +61,11 @@ export default function MobileHeader() {
               <span className="material-symbols-outlined text-on-surface text-[22px]">
                 shopping_cart
               </span>
+              {mounted && cartTotal > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] flex items-center justify-center rounded-full bg-primary text-white text-[9px] font-bold px-0.5">
+                  {cartTotal > 99 ? '99+' : cartTotal}
+                </span>
+              )}
             </Link>
           </div>
         </div>
@@ -88,7 +102,7 @@ export default function MobileHeader() {
             <div className="py-4">
               <div className="px-4 pb-3 mb-3 border-b border-outline-variant/40">
                 <Link
-                  href="/login"
+                  href={mounted && isAuthenticated ? '/profile' : '/login'}
                   className="flex items-center gap-3 py-2"
                   onClick={() => setMobileMenuOpen(false)}
                 >
@@ -97,10 +111,10 @@ export default function MobileHeader() {
                   </span>
                   <div>
                     <p className="text-sm font-semibold text-on-surface">
-                      로그인 / 회원가입
+                      {mounted && isAuthenticated && user ? user.name : '로그인 / 회원가입'}
                     </p>
                     <p className="text-xs text-on-surface-variant">
-                      도매가로 구매하세요
+                      {mounted && isAuthenticated ? user?.email : '도매가로 구매하세요'}
                     </p>
                   </div>
                 </Link>
@@ -109,12 +123,10 @@ export default function MobileHeader() {
               {[
                 { icon: 'home', label: '홈', href: '/' },
                 { icon: 'category', label: '카테고리', href: '/category' },
-                { icon: 'local_fire_department', label: '인기 상품', href: '/hot' },
-                { icon: 'new_releases', label: '신상품', href: '/new' },
-                { icon: 'percent', label: '특가', href: '/deals' },
+                { icon: 'search', label: '검색', href: '/search' },
                 { icon: 'inventory_2', label: '주문 내역', href: '/orders' },
                 { icon: 'favorite', label: '찜 목록', href: '/wishlist' },
-                { icon: 'help', label: '고객센터', href: '/help' },
+                { icon: 'help', label: '고객센터', href: '/faq' },
               ].map((item) => (
                 <Link
                   key={item.href}

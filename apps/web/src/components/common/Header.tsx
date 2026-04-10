@@ -1,11 +1,16 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useUIStore } from '@/stores/ui-store';
+import { useCartStore } from '@/stores/cart-store';
 import SearchBar from './SearchBar';
 import MobileHeader from './MobileHeader';
 
 export default function Header() {
+  const cartTotal = useCartStore((s) => s.totalItems());
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
   return (
     <>
       {/* Desktop Header */}
@@ -56,6 +61,11 @@ export default function Header() {
                 <span className="material-symbols-outlined text-on-surface">
                   shopping_cart
                 </span>
+                {mounted && cartTotal > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-primary text-white text-[10px] font-bold px-1">
+                    {cartTotal > 99 ? '99+' : cartTotal}
+                  </span>
+                )}
               </Link>
               <Link
                 href="/profile"

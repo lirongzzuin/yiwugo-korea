@@ -4,26 +4,61 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/cn';
+import { useAuthStore } from '@/stores/auth-store';
+import { useUIStore } from '@/stores/ui-store';
 
 export default function LoginPage() {
   const router = useRouter();
+  const login = useAuthStore((s) => s.login);
+  const showToast = useUIStore((s) => s.showToast);
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+
+  const validate = () => {
+    const newErrors: { email?: string; password?: string } = {};
+    if (!email.trim()) {
+      newErrors.email = '이메일을 입력해주세요';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      newErrors.email = '올바른 이메일 형식이 아닙니다';
+    }
+    if (!password.trim()) {
+      newErrors.password = '비밀번호를 입력해주세요';
+    } else if (password.length < 6) {
+      newErrors.password = '비밀번호는 6자 이상이어야 합니다';
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const isFormValid = email.trim() !== '' && password.trim() !== '';
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isFormValid) return;
+    if (!validate()) return;
     setIsLoading(true);
-    // Mock login
+
+    // Mock login - simulate API call
     setTimeout(() => {
+      login({
+        id: 'user-1',
+        name: '홍길동',
+        email: email,
+        memberType: 'INDIVIDUAL',
+        points: 3200,
+      });
       setIsLoading(false);
+      showToast('로그인 되었습니다', 'success');
       router.push('/');
-    }, 1200);
+    }, 1000);
+  };
+
+  const handleSocialLogin = (provider: string) => {
+    showToast(`${provider} 로그인은 준비 중입니다`, 'info');
   };
 
   return (
@@ -48,7 +83,9 @@ export default function LoginPage() {
 
       {/* Social Login Buttons */}
       <div className="flex flex-col gap-3">
-        <button className="relative flex items-center justify-center w-full h-12 rounded-xl font-semibold text-sm transition-all duration-200 hover:opacity-90 active:scale-[0.98]"
+        <button
+          onClick={() => handleSocialLogin('카카오')}
+          className="relative flex items-center justify-center w-full h-12 rounded-xl font-semibold text-sm transition-all duration-200 hover:opacity-90 active:scale-[0.98]"
           style={{ backgroundColor: '#FEE500', color: '#191919' }}
         >
           <svg className="absolute left-4 w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -57,7 +94,9 @@ export default function LoginPage() {
           카카오로 시작하기
         </button>
 
-        <button className="relative flex items-center justify-center w-full h-12 rounded-xl font-semibold text-sm text-white transition-all duration-200 hover:opacity-90 active:scale-[0.98]"
+        <button
+          onClick={() => handleSocialLogin('네이버')}
+          className="relative flex items-center justify-center w-full h-12 rounded-xl font-semibold text-sm text-white transition-all duration-200 hover:opacity-90 active:scale-[0.98]"
           style={{ backgroundColor: '#03C75A' }}
         >
           <svg className="absolute left-4 w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -66,7 +105,10 @@ export default function LoginPage() {
           네이버로 시작하기
         </button>
 
-        <button className="relative flex items-center justify-center w-full h-12 rounded-xl font-semibold text-sm text-white bg-black transition-all duration-200 hover:opacity-90 active:scale-[0.98]">
+        <button
+          onClick={() => handleSocialLogin('Apple')}
+          className="relative flex items-center justify-center w-full h-12 rounded-xl font-semibold text-sm text-white bg-black transition-all duration-200 hover:opacity-90 active:scale-[0.98]"
+        >
           <svg className="absolute left-4 w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
             <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
           </svg>
@@ -88,17 +130,32 @@ export default function LoginPage() {
             type="email"
             placeholder="이메일 주소"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full h-12 px-4 rounded-xl bg-surface-container border border-outline-variant/40 text-on-surface text-sm placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+            onChange={(e) => {
+              setEmail(e.target.value);
+              if (errors.email) setErrors((prev) => ({ ...prev, email: undefined }));
+            }}
+            className={cn(
+              'w-full h-12 px-4 rounded-xl bg-surface-container border text-on-surface text-sm placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all',
+              errors.email ? 'border-error' : 'border-outline-variant/40'
+            )}
           />
+          {errors.email && (
+            <p className="text-xs text-error mt-1 ml-1">{errors.email}</p>
+          )}
         </div>
         <div className="relative">
           <input
             type={showPassword ? 'text' : 'password'}
             placeholder="비밀번호"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full h-12 px-4 pr-12 rounded-xl bg-surface-container border border-outline-variant/40 text-on-surface text-sm placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+            onChange={(e) => {
+              setPassword(e.target.value);
+              if (errors.password) setErrors((prev) => ({ ...prev, password: undefined }));
+            }}
+            className={cn(
+              'w-full h-12 px-4 pr-12 rounded-xl bg-surface-container border text-on-surface text-sm placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all',
+              errors.password ? 'border-error' : 'border-outline-variant/40'
+            )}
           />
           <button
             type="button"
@@ -109,6 +166,9 @@ export default function LoginPage() {
               {showPassword ? 'visibility_off' : 'visibility'}
             </span>
           </button>
+          {errors.password && (
+            <p className="text-xs text-error mt-1 ml-1">{errors.password}</p>
+          )}
         </div>
 
         {/* Remember me */}

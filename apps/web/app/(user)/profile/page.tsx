@@ -1,14 +1,27 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/cn';
+import { useAuthStore } from '@/stores/auth-store';
+import { useCartStore } from '@/stores/cart-store';
+import { useWishlistStore } from '@/stores/wishlist-store';
+import { useUIStore } from '@/stores/ui-store';
+
+const DEMO_USER = {
+  id: 'demo-1',
+  name: '홍길동',
+  email: 'hong@example.com',
+  memberType: 'INDIVIDUAL' as const,
+  points: 3200,
+};
 
 const ORDER_FLOW = [
-  { label: '결제완료', count: 1, icon: 'credit_score' },
-  { label: '배송중', count: 1, icon: 'local_shipping' },
-  { label: '통관중', count: 1, icon: 'gavel' },
-  { label: '배송완료', count: 3, icon: 'inventory_2' },
+  { label: '결제완료', count: 0, icon: 'credit_score' },
+  { label: '배송중', count: 0, icon: 'local_shipping' },
+  { label: '통관중', count: 0, icon: 'gavel' },
+  { label: '배송완료', count: 0, icon: 'inventory_2' },
 ];
 
 const MENU_GROUPS = [
@@ -16,27 +29,64 @@ const MENU_GROUPS = [
     items: [
       { icon: 'local_shipping', label: '주문/배송 조회', href: '/orders' },
       { icon: 'favorite', label: '관심상품', href: '/wishlist' },
-      { icon: 'history', label: '최근 본 상품', href: '#' },
+      { icon: 'history', label: '최근 본 상품', href: '/wishlist' },
     ],
   },
   {
     items: [
-      { icon: 'rate_review', label: '나의 리뷰', href: '#' },
-      { icon: 'confirmation_number', label: '쿠폰함', href: '#' },
-      { icon: 'savings', label: '적립금 내역', href: '#' },
+      { icon: 'rate_review', label: '나의 리뷰', href: '/reviews' },
+      { icon: 'confirmation_number', label: '쿠폰함', href: '#coupon' },
+      { icon: 'savings', label: '적립금 내역', href: '#points' },
     ],
   },
   {
     items: [
-      { icon: 'location_on', label: '배송지 관리', href: '#' },
-      { icon: 'badge', label: '개인통관고유부호', href: '#' },
-      { icon: 'headset_mic', label: '고객센터', href: '#' },
+      { icon: 'location_on', label: '배송지 관리', href: '/settings' },
+      { icon: 'badge', label: '개인통관고유부호', href: '/settings' },
+      { icon: 'headset_mic', label: '고객센터', href: '/faq' },
     ],
   },
 ];
 
 export default function ProfilePage() {
   const router = useRouter();
+  const authUser = useAuthStore((s) => s.user);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const logout = useAuthStore((s) => s.logout);
+  const showToast = useUIStore((s) => s.showToast);
+  const wishlistCount = useWishlistStore((s) => s.totalItems());
+  const cartCount = useCartStore((s) => s.totalItems());
+
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
+  const user = authUser || DEMO_USER;
+
+  const handleMenuClick = (href: string, e: React.MouseEvent) => {
+    if (href === '#coupon') {
+      e.preventDefault();
+      showToast('쿠폰함은 준비 중입니다', 'info');
+    } else if (href === '#points') {
+      e.preventDefault();
+      showToast('적립금 내역은 준비 중입니다', 'info');
+    }
+  };
+
+  const handleLogout = () => {
+    logout();
+    showToast('로그아웃 되었습니다', 'info');
+    router.push('/');
+  };
+
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-surface-container-low max-w-3xl mx-auto pb-8">
+        <div className="flex items-center justify-center py-24">
+          <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-surface-container-low max-w-3xl mx-auto pb-8">
@@ -48,15 +98,15 @@ export default function ProfilePage() {
           </div>
           <div className="flex-1">
             <div className="flex items-center gap-2">
-              <h1 className="font-heading text-lg font-bold text-on-surface">홍길동</h1>
+              <h1 className="font-heading text-lg font-bold text-on-surface">{user.name}</h1>
               <span className="px-2 py-0.5 rounded-md bg-primary/10 text-primary text-[11px] font-semibold">
-                개인 구매자
+                {user.memberType === 'BUSINESS' ? '사업자' : '개인 구매자'}
               </span>
             </div>
-            <p className="text-sm text-on-surface-variant mt-0.5">hong@example.com</p>
+            <p className="text-sm text-on-surface-variant mt-0.5">{user.email}</p>
           </div>
           <Link
-            href="#"
+            href="/settings"
             className="w-9 h-9 rounded-full bg-surface-container flex items-center justify-center hover:bg-surface-container-high transition-colors"
           >
             <span className="material-symbols-outlined text-on-surface-variant text-[20px]">settings</span>
@@ -66,13 +116,19 @@ export default function ProfilePage() {
         {/* Summary bar */}
         <div className="grid grid-cols-3 mt-5 rounded-2xl bg-surface-container-low border border-outline-variant/30 overflow-hidden">
           {[
-            { label: '적립금', value: '3,200원', icon: 'savings' },
-            { label: '쿠폰함', value: '2장', icon: 'confirmation_number' },
-            { label: '찜한상품', value: '12개', icon: 'favorite' },
+            { label: '적립금', value: `${user.points.toLocaleString()}원`, icon: 'savings', href: '#points' },
+            { label: '장바구니', value: `${cartCount}개`, icon: 'shopping_cart', href: '/cart' },
+            { label: '찜한상품', value: `${wishlistCount}개`, icon: 'favorite', href: '/wishlist' },
           ].map((item, i) => (
             <Link
               key={item.label}
-              href="#"
+              href={item.href === '#points' ? '#' : item.href}
+              onClick={(e) => {
+                if (item.href === '#points') {
+                  e.preventDefault();
+                  showToast('적립금 내역은 준비 중입니다', 'info');
+                }
+              }}
               className={cn(
                 'flex flex-col items-center py-4 hover:bg-surface-container transition-colors',
                 i < 2 && 'border-r border-outline-variant/30'
@@ -128,7 +184,8 @@ export default function ProfilePage() {
             {group.items.map((item, i) => (
               <Link
                 key={item.label}
-                href={item.href}
+                href={item.href.startsWith('#') ? '#' : item.href}
+                onClick={(e) => handleMenuClick(item.href, e)}
                 className={cn(
                   'flex items-center gap-3 px-5 py-3.5 hover:bg-surface-container-low transition-colors',
                   i < group.items.length - 1 && 'border-b border-outline-variant/20'
@@ -146,7 +203,7 @@ export default function ProfilePage() {
       {/* Logout */}
       <div className="mt-2 bg-white">
         <button
-          onClick={() => router.push('/login')}
+          onClick={handleLogout}
           className="flex items-center gap-3 px-5 py-3.5 w-full hover:bg-surface-container-low transition-colors"
         >
           <span className="material-symbols-outlined text-error text-[22px]">logout</span>

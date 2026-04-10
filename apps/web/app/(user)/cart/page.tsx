@@ -1,84 +1,35 @@
 'use client';
 
-import { useState } from 'react';
-import Image from 'next/image';
+import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { cn } from '@/lib/cn';
-
-interface CartItem {
-  id: string;
-  name: string;
-  option: string;
-  priceKRW: number;
-  priceCNY: number;
-  quantity: number;
-  image: string;
-  shopId: string;
-}
-
-interface Shop {
-  id: string;
-  name: string;
-  items: CartItem[];
-  shippingEstimate: string;
-}
-
-const MOCK_SHOPS: Shop[] = [
-  {
-    id: 'shop1',
-    name: '광저우 디지털 마트',
-    shippingEstimate: '예상 배송비 ¥28 (~₩5,400)',
-    items: [
-      {
-        id: '1',
-        name: 'USB-C 멀티 허브 7in1 4K HDMI 어댑터',
-        option: '색상: 실버 / 모델: 7포트',
-        priceKRW: 18900,
-        priceCNY: 99,
-        quantity: 10,
-        image: '/placeholder-product.png',
-        shopId: 'shop1',
-      },
-      {
-        id: '2',
-        name: '무선 블루투스 이어버드 TWS 5.3',
-        option: '색상: 화이트',
-        priceKRW: 8500,
-        priceCNY: 45,
-        quantity: 20,
-        image: '/placeholder-product.png',
-        shopId: 'shop1',
-      },
-    ],
-  },
-  {
-    id: 'shop2',
-    name: '이우 패션 센터',
-    shippingEstimate: '예상 배송비 ¥45 (~₩8,700)',
-    items: [
-      {
-        id: '3',
-        name: '여성 캐주얼 니트 가디건 오버핏',
-        option: '색상: 베이지 / 사이즈: Free',
-        priceKRW: 12400,
-        priceCNY: 65,
-        quantity: 5,
-        image: '/placeholder-product.png',
-        shopId: 'shop2',
-      },
-    ],
-  },
-];
+import { useCartStore } from '@/stores/cart-store';
+import { useUIStore } from '@/stores/ui-store';
 
 export default function CartPage() {
-  const [shops, setShops] = useState(MOCK_SHOPS);
-  const [selectedItems, setSelectedItems] = useState<Set<string>>(
-    new Set(MOCK_SHOPS.flatMap((s) => s.items.map((i) => i.id)))
-  );
+  const items = useCartStore((s) => s.items);
+  const removeItem = useCartStore((s) => s.removeItem);
+  const updateQuantity = useCartStore((s) => s.updateQuantity);
+  const clearCart = useCartStore((s) => s.clearCart);
+  const getGroupedByShop = useCartStore((s) => s.getGroupedByShop);
+  const showToast = useUIStore((s) => s.showToast);
 
-  const allItems = shops.flatMap((s) => s.items);
-  const allSelected = allItems.length > 0 && allItems.every((item) => selectedItems.has(item.id));
-  const selectedCount = allItems.filter((item) => selectedItems.has(item.id)).length;
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Select all items by default when items change
+  useEffect(() => {
+    setSelectedItems(new Set(items.map((i) => i.id)));
+  }, [items]);
+
+  const grouped = useMemo(() => getGroupedByShop(), [items, getGroupedByShop]);
+
+  const allSelected = items.length > 0 && items.every((item) => selectedItems.has(item.id));
+  const selectedCount = items.filter((item) => selectedItems.has(item.id)).length;
 
   const toggleItem = (id: string) => {
     setSelectedItems((prev) => {
@@ -90,9 +41,8 @@ export default function CartPage() {
   };
 
   const toggleShop = (shopId: string) => {
-    const shop = shops.find((s) => s.id === shopId);
-    if (!shop) return;
-    const shopItemIds = shop.items.map((i) => i.id);
+    const shopItems = grouped[shopId] || [];
+    const shopItemIds = shopItems.map((i) => i.id);
     const allShopSelected = shopItemIds.every((id) => selectedItems.has(id));
     setSelectedItems((prev) => {
       const next = new Set(prev);
@@ -108,58 +58,47 @@ export default function CartPage() {
     if (allSelected) {
       setSelectedItems(new Set());
     } else {
-      setSelectedItems(new Set(allItems.map((i) => i.id)));
+      setSelectedItems(new Set(items.map((i) => i.id)));
     }
   };
 
-  const updateQuantity = (itemId: string, delta: number) => {
-    setShops((prev) =>
-      prev.map((shop) => ({
-        ...shop,
-        items: shop.items.map((item) =>
-          item.id === itemId
-            ? { ...item, quantity: Math.max(1, item.quantity + delta) }
-            : item
-        ),
-      }))
-    );
+  const handleRemove = (id: string) => {
+    removeItem(id);
+    showToast('상품이 삭제되었습니다', 'info');
   };
 
-  const removeItem = (itemId: string) => {
-    setShops((prev) =>
-      prev
-        .map((shop) => ({
-          ...shop,
-          items: shop.items.filter((item) => item.id !== itemId),
-        }))
-        .filter((shop) => shop.items.length > 0)
+  const totalKRW = items
+    .filter((item) => selectedItems.has(item.id))
+    .reduce((sum, item) => sum + item.priceKrw * item.quantity, 0);
+
+  const totalCNY = items
+    .filter((item) => selectedItems.has(item.id))
+    .reduce((sum, item) => sum + item.priceCny * item.quantity, 0);
+
+  const isEmpty = items.length === 0;
+
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-surface max-w-3xl mx-auto">
+        <div className="sticky top-14 md:top-16 z-10 bg-surface/95 backdrop-blur-md px-5 py-3 border-b border-outline-variant/30">
+          <h1 className="font-heading text-xl font-bold">장바구니</h1>
+        </div>
+        <div className="flex items-center justify-center py-24">
+          <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+        </div>
+      </div>
     );
-    setSelectedItems((prev) => {
-      const next = new Set(prev);
-      next.delete(itemId);
-      return next;
-    });
-  };
-
-  const totalKRW = allItems
-    .filter((item) => selectedItems.has(item.id))
-    .reduce((sum, item) => sum + item.priceKRW * item.quantity, 0);
-
-  const totalCNY = allItems
-    .filter((item) => selectedItems.has(item.id))
-    .reduce((sum, item) => sum + item.priceCNY * item.quantity, 0);
-
-  const isEmpty = allItems.length === 0;
+  }
 
   return (
     <div className="min-h-screen bg-surface max-w-3xl mx-auto">
       {/* Header */}
       <div className="sticky top-14 md:top-16 z-10 bg-surface/95 backdrop-blur-md px-5 py-3 border-b border-outline-variant/30">
         <h1 className="font-heading text-xl font-bold">
-          Cart
+          장바구니
           {!isEmpty && (
             <span className="text-on-surface-variant font-normal text-base ml-2">
-              ({allItems.length})
+              ({items.length})
             </span>
           )}
         </h1>
@@ -190,16 +129,17 @@ export default function CartPage() {
         <>
           {/* Cart items grouped by shop */}
           <div className="px-4 py-4 space-y-4 pb-40">
-            {shops.map((shop) => {
-              const shopItemIds = shop.items.map((i) => i.id);
+            {Object.entries(grouped).map(([shopId, shopItems]) => {
+              const shopName = shopItems[0]?.shopName || shopId;
+              const shopItemIds = shopItems.map((i) => i.id);
               const allShopSelected = shopItemIds.every((id) => selectedItems.has(id));
 
               return (
-                <div key={shop.id} className="bg-white rounded-2xl border border-outline-variant/30 overflow-hidden shadow-soft">
+                <div key={shopId} className="bg-white rounded-2xl border border-outline-variant/30 overflow-hidden shadow-soft">
                   {/* Shop header */}
                   <div className="flex items-center gap-3 px-4 py-3 border-b border-outline-variant/20 bg-surface-container-low">
                     <button
-                      onClick={() => toggleShop(shop.id)}
+                      onClick={() => toggleShop(shopId)}
                       className={cn(
                         'w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all shrink-0',
                         allShopSelected
@@ -212,7 +152,7 @@ export default function CartPage() {
                       )}
                     </button>
                     <span className="material-symbols-outlined text-on-surface-variant text-[20px]">store</span>
-                    <span className="text-sm font-semibold text-on-surface">{shop.name}</span>
+                    <span className="text-sm font-semibold text-on-surface">{shopName}</span>
                     <span className="material-symbols-outlined text-on-surface-variant/50 text-[18px] ml-auto">
                       chevron_right
                     </span>
@@ -220,7 +160,7 @@ export default function CartPage() {
 
                   {/* Items */}
                   <div className="divide-y divide-outline-variant/20">
-                    {shop.items.map((item) => (
+                    {shopItems.map((item) => (
                       <div key={item.id} className="flex gap-3 p-4">
                         {/* Checkbox */}
                         <button
@@ -239,42 +179,46 @@ export default function CartPage() {
 
                         {/* Thumbnail */}
                         <div className="w-20 h-20 rounded-xl bg-surface-container overflow-hidden shrink-0">
-                          <div className="w-full h-full bg-surface-container-high flex items-center justify-center">
-                            <span className="material-symbols-outlined text-on-surface-variant/30 text-[32px]">
-                              image
-                            </span>
-                          </div>
+                          {item.imageUrl ? (
+                            <img src={item.imageUrl} alt={item.productName} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full bg-surface-container-high flex items-center justify-center">
+                              <span className="material-symbols-outlined text-on-surface-variant/30 text-[32px]">image</span>
+                            </div>
+                          )}
                         </div>
 
                         {/* Info */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2">
                             <h3 className="text-sm font-medium text-on-surface line-clamp-2 leading-tight">
-                              {item.name}
+                              {item.productName}
                             </h3>
                             <button
-                              onClick={() => removeItem(item.id)}
+                              onClick={() => handleRemove(item.id)}
                               className="text-on-surface-variant/50 hover:text-error transition-colors shrink-0"
                             >
                               <span className="material-symbols-outlined text-[18px]">close</span>
                             </button>
                           </div>
-                          <p className="text-xs text-on-surface-variant mt-1">{item.option}</p>
+                          {item.options && (
+                            <p className="text-xs text-on-surface-variant mt-1">{item.options}</p>
+                          )}
 
                           <div className="flex items-end justify-between mt-2">
                             <div>
                               <p className="text-sm font-bold text-on-surface">
-                                {(item.priceKRW * item.quantity).toLocaleString()}원
+                                {(item.priceKrw * item.quantity).toLocaleString()}원
                               </p>
                               <p className="text-xs text-on-surface-variant">
-                                ¥{(item.priceCNY * item.quantity).toLocaleString()}
+                                ¥{(item.priceCny * item.quantity).toLocaleString()}
                               </p>
                             </div>
 
                             {/* Quantity stepper */}
                             <div className="flex items-center gap-0 border border-outline-variant/40 rounded-lg overflow-hidden">
                               <button
-                                onClick={() => updateQuantity(item.id, -1)}
+                                onClick={() => updateQuantity(item.id, item.quantity - 1)}
                                 className="w-8 h-8 flex items-center justify-center hover:bg-surface-container transition-colors"
                               >
                                 <span className="material-symbols-outlined text-[18px]">remove</span>
@@ -283,7 +227,7 @@ export default function CartPage() {
                                 {item.quantity}
                               </span>
                               <button
-                                onClick={() => updateQuantity(item.id, 1)}
+                                onClick={() => updateQuantity(item.id, item.quantity + 1)}
                                 className="w-8 h-8 flex items-center justify-center hover:bg-surface-container transition-colors"
                               >
                                 <span className="material-symbols-outlined text-[18px]">add</span>
@@ -293,14 +237,6 @@ export default function CartPage() {
                         </div>
                       </div>
                     ))}
-                  </div>
-
-                  {/* Shipping estimate */}
-                  <div className="px-4 py-2.5 bg-surface-container-low border-t border-outline-variant/20">
-                    <div className="flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-tertiary text-[16px]">local_shipping</span>
-                      <span className="text-xs text-on-surface-variant">{shop.shippingEstimate}</span>
-                    </div>
                   </div>
                 </div>
               );
@@ -350,7 +286,7 @@ export default function CartPage() {
                     : 'bg-outline-variant/60 pointer-events-none'
                 )}
               >
-                Checkout ({selectedCount})
+                주문하기 ({selectedCount})
               </Link>
             </div>
           </div>

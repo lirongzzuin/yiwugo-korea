@@ -1,8 +1,10 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/cn';
+import { useCartStore } from '@/stores/cart-store';
 
 interface NavItem {
   icon: string;
@@ -10,6 +12,7 @@ interface NavItem {
   label: string;
   href: string;
   match: (pathname: string) => boolean;
+  showBadge?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -40,6 +43,7 @@ const NAV_ITEMS: NavItem[] = [
     label: '장바구니',
     href: '/cart',
     match: (p) => p.startsWith('/cart'),
+    showBadge: true,
   },
   {
     icon: 'person',
@@ -52,6 +56,9 @@ const NAV_ITEMS: NavItem[] = [
 
 export default function BottomNav() {
   const pathname = usePathname();
+  const cartTotal = useCartStore((s) => s.totalItems());
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-surface/90 backdrop-blur-lg border-t border-outline-variant/40 rounded-t-2xl shadow-strong">
@@ -71,7 +78,7 @@ export default function BottomNav() {
             >
               <div
                 className={cn(
-                  'flex items-center justify-center w-8 h-8 rounded-full transition-all duration-200',
+                  'flex items-center justify-center w-8 h-8 rounded-full transition-all duration-200 relative',
                   isActive && 'bg-primary/10'
                 )}
               >
@@ -83,6 +90,11 @@ export default function BottomNav() {
                 >
                   {isActive ? item.filledIcon : item.icon}
                 </span>
+                {item.showBadge && mounted && cartTotal > 0 && (
+                  <span className="absolute -top-1 -right-1.5 min-w-[16px] h-[16px] flex items-center justify-center rounded-full bg-primary text-white text-[9px] font-bold px-0.5">
+                    {cartTotal > 99 ? '99+' : cartTotal}
+                  </span>
+                )}
               </div>
               <span
                 className={cn(

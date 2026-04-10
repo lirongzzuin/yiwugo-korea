@@ -1,49 +1,126 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { cn } from '@/lib/cn';
 import ProductPrice from '@/components/product/ProductPrice';
+import { useCartStore } from '@/stores/cart-store';
+import { useWishlistStore } from '@/stores/wishlist-store';
+import { useUIStore } from '@/stores/ui-store';
 
 // --- Mock Data ---
-const MOCK_PRODUCT = {
-  id: 'prod-1',
-  name: 'LED 무드등 감성 조명 RGB 인테리어 수면등 침실 취침등 리모컨 포함',
-  images: Array.from({ length: 8 }, (_, i) => `https://picsum.photos/seed/detail${i}/600/600`),
-  category: '리빙/주방',
-  priceKRW: 12500,
-  originalPriceKRW: 18000,
-  priceCNY: 65.79,
-  discountPercent: 31,
-  moq: 20,
-  rating: 4.6,
-  reviewCount: 328,
-  salesCount: 5840,
-  colors: ['화이트', '블랙', '우드', '핑크'],
-  sizes: ['S (15cm)', 'M (20cm)', 'L (25cm)'],
-  deliveryDays: '7~12',
-  shop: {
-    id: 'shop-1',
-    name: 'YiwuLED Official Store',
-    logo: 'https://picsum.photos/seed/shop1/100/100',
-    verified: true,
-    location: '이우시 푸톈구',
-    responseRate: 98,
-    products: 1240,
-    followers: 3560,
+const MOCK_PRODUCTS = [
+  {
+    id: 'prod-1',
+    name: 'LED 무드등 감성 조명 RGB 인테리어 수면등 침실 취침등 리모컨 포함',
+    images: Array.from({ length: 8 }, (_, i) => `https://picsum.photos/seed/detail${i}/600/600`),
+    category: '리빙/주방',
+    priceKRW: 12500,
+    originalPriceKRW: 18000,
+    priceCNY: 65.79,
+    discountPercent: 31,
+    moq: 20,
+    rating: 4.6,
+    reviewCount: 328,
+    salesCount: 5840,
+    colors: ['화이트', '블랙', '우드', '핑크'],
+    sizes: ['S (15cm)', 'M (20cm)', 'L (25cm)'],
+    deliveryDays: '7~12',
+    shop: {
+      id: 'shop-1',
+      name: 'YiwuLED Official Store',
+      logo: 'https://picsum.photos/seed/shop1/100/100',
+      verified: true,
+      location: '이우시 푸톈구',
+      responseRate: 98,
+      products: 1240,
+      followers: 3560,
+    },
+    description: `
+      <p>고품질 LED 무드등으로 감성 인테리어를 완성하세요.</p>
+      <ul>
+        <li>RGB 16색 변환</li>
+        <li>리모컨 제어 + 터치 제어</li>
+        <li>USB 충전식 (2시간 충전, 8시간 사용)</li>
+        <li>IP65 방수 등급</li>
+        <li>무게: 250g</li>
+      </ul>
+    `,
   },
-  description: `
-    <p>고품질 LED 무드등으로 감성 인테리어를 완성하세요.</p>
-    <ul>
-      <li>RGB 16색 변환</li>
-      <li>리모컨 제어 + 터치 제어</li>
-      <li>USB 충전식 (2시간 충전, 8시간 사용)</li>
-      <li>IP65 방수 등급</li>
-      <li>무게: 250g</li>
-    </ul>
-  `,
-};
+  {
+    id: 'prod-2',
+    name: '실리콘 주방용품 세트 12종 논슬립 내열 조리도구',
+    images: Array.from({ length: 6 }, (_, i) => `https://picsum.photos/seed/kitchen${i}/600/600`),
+    category: '리빙/주방',
+    priceKRW: 8900,
+    originalPriceKRW: 12000,
+    priceCNY: 46.84,
+    discountPercent: 26,
+    moq: 10,
+    rating: 4.4,
+    reviewCount: 156,
+    salesCount: 3200,
+    colors: ['그린', '핑크', '그레이'],
+    sizes: ['12종 세트', '6종 세트'],
+    deliveryDays: '7~10',
+    shop: {
+      id: 'shop-2',
+      name: '이우 키친웨어',
+      logo: 'https://picsum.photos/seed/shop2/100/100',
+      verified: true,
+      location: '이우시 궈제상마오청',
+      responseRate: 95,
+      products: 860,
+      followers: 2100,
+    },
+    description: `
+      <p>내열 실리콘 소재로 안전한 주방용품 세트입니다.</p>
+      <ul>
+        <li>내열 온도: 230도</li>
+        <li>FDA 인증 식품 등급 실리콘</li>
+        <li>논슬립 손잡이</li>
+        <li>식기세척기 사용 가능</li>
+      </ul>
+    `,
+  },
+  {
+    id: 'prod-3',
+    name: 'USB-C 멀티 허브 7in1 4K HDMI 어댑터 맥북 프로 호환',
+    images: Array.from({ length: 6 }, (_, i) => `https://picsum.photos/seed/hub${i}/600/600`),
+    category: '디지털',
+    priceKRW: 18900,
+    originalPriceKRW: 25000,
+    priceCNY: 99.47,
+    discountPercent: 24,
+    moq: 50,
+    rating: 4.7,
+    reviewCount: 412,
+    salesCount: 8920,
+    colors: ['실버', '스페이스그레이'],
+    sizes: ['7포트', '5포트'],
+    deliveryDays: '5~8',
+    shop: {
+      id: 'shop-3',
+      name: '광저우 디지털 마트',
+      logo: 'https://picsum.photos/seed/shop3/100/100',
+      verified: true,
+      location: '광저우시 텐허구',
+      responseRate: 99,
+      products: 2340,
+      followers: 5800,
+    },
+    description: `
+      <p>7-in-1 USB-C 멀티 허브로 생산성을 높이세요.</p>
+      <ul>
+        <li>4K HDMI 출력</li>
+        <li>USB 3.0 x 3</li>
+        <li>SD/TF 카드 리더</li>
+        <li>PD 100W 충전</li>
+      </ul>
+    `,
+  },
+];
 
 const MOCK_REVIEWS = [
   { id: '1', user: '김**', rating: 5, date: '2026-03-28', content: '품질 좋고 색상이 예뻐요. 대량 주문에도 일관된 품질입니다.' },
@@ -55,14 +132,71 @@ type TabKey = 'detail' | 'reviews' | 'inquiry';
 
 export default function ProductDetailPage() {
   const params = useParams();
+  const router = useRouter();
+  const productId = params.id as string;
+
+  const product = useMemo(() => {
+    return MOCK_PRODUCTS.find(p => p.id === productId) || MOCK_PRODUCTS[0];
+  }, [productId]);
+
   const [currentImage, setCurrentImage] = useState(0);
   const [selectedColor, setSelectedColor] = useState(0);
   const [selectedSize, setSelectedSize] = useState(0);
-  const [quantity, setQuantity] = useState(MOCK_PRODUCT.moq);
+  const [quantity, setQuantity] = useState(product.moq);
   const [activeTab, setActiveTab] = useState<TabKey>('detail');
-  const [isFav, setIsFav] = useState(false);
 
-  const product = MOCK_PRODUCT;
+  const addToCart = useCartStore((s) => s.addItem);
+  const toggleWishlist = useWishlistStore((s) => s.toggleItem);
+  const isWishlisted = useWishlistStore((s) => s.isWishlisted(product.id));
+  const showToast = useUIStore((s) => s.showToast);
+
+  const handleAddToCart = () => {
+    addToCart({
+      productId: product.id,
+      productName: product.name,
+      shopId: product.shop.id,
+      shopName: product.shop.name,
+      imageUrl: product.images[0],
+      priceKrw: product.priceKRW,
+      priceCny: product.priceCNY,
+      quantity,
+      options: `${product.colors[selectedColor]} / ${product.sizes[selectedSize]}`,
+      minOrderQty: product.moq,
+    });
+    showToast('장바구니에 추가되었습니다', 'success');
+  };
+
+  const handleBuyNow = () => {
+    addToCart({
+      productId: product.id,
+      productName: product.name,
+      shopId: product.shop.id,
+      shopName: product.shop.name,
+      imageUrl: product.images[0],
+      priceKrw: product.priceKRW,
+      priceCny: product.priceCNY,
+      quantity,
+      options: `${product.colors[selectedColor]} / ${product.sizes[selectedSize]}`,
+      minOrderQty: product.moq,
+    });
+    router.push('/checkout');
+  };
+
+  const handleToggleWishlist = () => {
+    toggleWishlist({
+      productId: product.id,
+      productName: product.name,
+      imageUrl: product.images[0],
+      priceKrw: product.priceKRW,
+      priceCny: product.priceCNY,
+      category: product.category,
+      addedAt: new Date().toISOString(),
+    });
+    showToast(
+      isWishlisted ? '찜 목록에서 제거되었습니다' : '찜 목록에 추가되었습니다',
+      'success'
+    );
+  };
 
   const tabs: { key: TabKey; label: string }[] = [
     { key: 'detail', label: '상세정보' },
@@ -393,15 +527,15 @@ export default function ProductDetailPage() {
       <div className="fixed bottom-0 left-0 right-0 bg-surface-container-lowest border-t border-outline-variant/20 px-4 py-3 z-40">
         <div className="max-w-3xl mx-auto flex items-center gap-2">
           <button
-            onClick={() => setIsFav(!isFav)}
+            onClick={handleToggleWishlist}
             className="w-11 h-11 flex items-center justify-center rounded-xl border border-outline-variant/40 hover:border-primary transition-colors flex-shrink-0"
           >
             <span
               className={cn(
                 'material-symbols-outlined text-[22px]',
-                isFav ? 'text-primary' : 'text-on-surface-variant'
+                isWishlisted ? 'text-primary' : 'text-on-surface-variant'
               )}
-              style={isFav ? { fontVariationSettings: "'FILL' 1" } : undefined}
+              style={isWishlisted ? { fontVariationSettings: "'FILL' 1" } : undefined}
             >
               favorite
             </span>
@@ -409,10 +543,16 @@ export default function ProductDetailPage() {
           <button className="w-11 h-11 flex items-center justify-center rounded-xl border border-outline-variant/40 hover:border-primary transition-colors flex-shrink-0">
             <span className="material-symbols-outlined text-[22px] text-on-surface-variant">chat</span>
           </button>
-          <button className="flex-1 h-11 rounded-xl border-2 border-primary text-primary text-sm font-semibold hover:bg-primary/5 transition-colors">
+          <button
+            onClick={handleAddToCart}
+            className="flex-1 h-11 rounded-xl border-2 border-primary text-primary text-sm font-semibold hover:bg-primary/5 transition-colors"
+          >
             장바구니
           </button>
-          <button className="flex-1 h-11 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-primary-container transition-colors">
+          <button
+            onClick={handleBuyNow}
+            className="flex-1 h-11 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-primary-container transition-colors"
+          >
             바로구매
           </button>
         </div>
