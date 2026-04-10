@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { cn } from '@/lib/cn';
 import ProductPrice from '@/components/product/ProductPrice';
+import CostBreakdown from '@/components/product/CostBreakdown';
+import ImportDisclaimer from '@/components/product/ImportDisclaimer';
 import { useCartStore } from '@/stores/cart-store';
 import { useWishlistStore } from '@/stores/wishlist-store';
 import { useUIStore } from '@/stores/ui-store';
@@ -26,6 +28,7 @@ const MOCK_PRODUCTS = [
     salesCount: 5840,
     colors: ['화이트', '블랙', '우드', '핑크'],
     sizes: ['S (15cm)', 'M (20cm)', 'L (25cm)'],
+    weightKg: 0.25,
     deliveryDays: '7~12',
     shop: {
       id: 'shop-1',
@@ -63,6 +66,7 @@ const MOCK_PRODUCTS = [
     salesCount: 3200,
     colors: ['그린', '핑크', '그레이'],
     sizes: ['12종 세트', '6종 세트'],
+    weightKg: 1.2,
     deliveryDays: '7~10',
     shop: {
       id: 'shop-2',
@@ -99,6 +103,7 @@ const MOCK_PRODUCTS = [
     salesCount: 8920,
     colors: ['실버', '스페이스그레이'],
     sizes: ['7포트', '5포트'],
+    weightKg: 0.15,
     deliveryDays: '5~8',
     shop: {
       id: 'shop-3',
@@ -237,6 +242,9 @@ export default function ProductDetailPage() {
       </div>
 
       <div className="max-w-3xl mx-auto">
+        {/* Import disclaimer banner */}
+        <ImportDisclaimer />
+
         {/* Price Section */}
         <div className="px-4 py-4 bg-surface-container-lowest">
           <ProductPrice
@@ -290,6 +298,13 @@ export default function ProductDetailPage() {
             </div>
           </div>
         </div>
+
+        {/* Cost Breakdown */}
+        <CostBreakdown
+          priceCny={product.priceCNY}
+          quantity={quantity}
+          weightKg={product.weightKg}
+        />
 
         {/* Store Info Card */}
         <div className="mx-4 mt-3 p-4 bg-surface-container-lowest rounded-xl border border-outline-variant/20">

@@ -9,6 +9,7 @@ interface ProductPriceProps {
   discountPercent?: number;
   size?: 'sm' | 'md' | 'lg';
   className?: string;
+  isCrossBorder?: boolean;
 }
 
 export default function ProductPrice({
@@ -18,6 +19,7 @@ export default function ProductPrice({
   discountPercent,
   size = 'md',
   className,
+  isCrossBorder = true,
 }: ProductPriceProps) {
   const sizeClasses = {
     sm: { main: 'text-sm', original: 'text-xs', cny: 'text-[10px]', badge: 'text-[10px] px-1 py-0.5' },
@@ -44,11 +46,18 @@ export default function ProductPrice({
           </span>
         )}
       </div>
-      {priceCNY !== undefined && (
-        <span className={cn('text-stone-400', s.cny)}>
-          ¥{priceCNY.toFixed(2)} CNY
-        </span>
-      )}
+      <div className="flex items-center gap-2 flex-wrap">
+        {priceCNY !== undefined && (
+          <span className={cn('text-stone-400', s.cny)}>
+            ¥{priceCNY.toFixed(2)} CNY
+          </span>
+        )}
+        {isCrossBorder && (
+          <span className={cn('text-stone-400', s.cny)}>
+            (관부가세 별도)
+          </span>
+        )}
+      </div>
     </div>
   );
 }

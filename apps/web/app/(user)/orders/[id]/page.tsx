@@ -51,7 +51,7 @@ export default function OrderDetailPage() {
               <p className="font-heading font-bold text-lg">YWG-2026-041001</p>
             </div>
             <span className="px-3 py-1.5 rounded-full bg-white/20 text-white text-xs font-semibold backdrop-blur-sm">
-              International Transit
+              국제 운송 중
             </span>
           </div>
           <p className="text-white/80 text-sm mb-4">
@@ -60,11 +60,11 @@ export default function OrderDetailPage() {
           <div className="flex gap-2">
             <button className="flex-1 py-2.5 rounded-xl bg-white/20 backdrop-blur-sm text-white text-sm font-semibold hover:bg-white/30 transition-all flex items-center justify-center gap-1.5">
               <span className="material-symbols-outlined text-[18px]">support_agent</span>
-              Contact
+              판매자 문의
             </button>
             <button className="flex-1 py-2.5 rounded-xl bg-white/20 backdrop-blur-sm text-white text-sm font-semibold hover:bg-white/30 transition-all flex items-center justify-center gap-1.5">
               <span className="material-symbols-outlined text-[18px]">receipt</span>
-              Invoice
+              영수증
             </button>
           </div>
         </section>
@@ -114,7 +114,7 @@ export default function OrderDetailPage() {
 
           {/* Timeline */}
           <div className="p-5">
-            <h3 className="font-heading font-bold text-sm text-on-surface mb-4">배송 여정</h3>
+            <h3 className="font-heading font-bold text-sm text-on-surface mb-4">배송 추적</h3>
             <div className="space-y-0">
               {TIMELINE_STEPS.map((step, i) => (
                 <div key={i} className="flex gap-3">

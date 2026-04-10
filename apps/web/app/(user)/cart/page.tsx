@@ -127,6 +127,19 @@ export default function CartPage() {
         </div>
       ) : (
         <>
+          {/* Combined shipping notice */}
+          {Object.keys(grouped).length > 0 && Object.values(grouped).some((g) => g.length > 1) && (
+            <div className="mx-4 mt-4 p-3 bg-tertiary/5 border border-tertiary/20 rounded-xl flex items-start gap-2.5">
+              <span className="material-symbols-outlined text-tertiary text-[18px] mt-0.5 shrink-0">local_shipping</span>
+              <p className="text-xs text-on-surface-variant leading-relaxed">
+                <span className="font-semibold text-tertiary">합배송 할인 안내</span>
+                <br />
+                같은 상점 상품 합배송 시 배송비를 절약할 수 있습니다.
+                상점별로 묶어서 주문하시면 국제 배송비가 절감됩니다.
+              </p>
+            </div>
+          )}
+
           {/* Cart items grouped by shop */}
           <div className="px-4 py-4 space-y-4 pb-40">
             {Object.entries(grouped).map(([shopId, shopItems]) => {

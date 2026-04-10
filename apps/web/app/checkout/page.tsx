@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/cn';
 
@@ -11,6 +11,7 @@ const MOCK_ITEMS = [
     option: '색상: 실버 / 모델: 7포트',
     priceKRW: 18900,
     quantity: 10,
+    weightKg: 0.15,
     image: '',
   },
   {
@@ -19,6 +20,7 @@ const MOCK_ITEMS = [
     option: '색상: 화이트',
     priceKRW: 8500,
     quantity: 20,
+    weightKg: 0.08,
     image: '',
   },
 ];
@@ -37,6 +39,14 @@ const PAYMENT_METHODS = [
   { id: 'bank', icon: 'account_balance', label: '무통장입금', color: '#5b403b' },
 ];
 
+const AIR_RATE_PER_KG = 5500;
+const SEA_RATE_PER_KG = 2000;
+const BASE_SHIPPING_FEE = 3000;
+const USD_TO_KRW = 1380;
+const DUTY_FREE_LIMIT_USD = 150;
+const CUSTOMS_DUTY_RATE = 0.08;
+const VAT_RATE = 0.10;
+
 export default function CheckoutPage() {
   const router = useRouter();
   const [isOrderExpanded, setIsOrderExpanded] = useState(true);
@@ -47,19 +57,52 @@ export default function CheckoutPage() {
   const [agreeAll, setAgreeAll] = useState(false);
   const [agreeOrder, setAgreeOrder] = useState(false);
   const [agreeRefund, setAgreeRefund] = useState(false);
+  const [shippingMethod, setShippingMethod] = useState<'AIR' | 'SEA'>('AIR');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const subtotal = MOCK_ITEMS.reduce((sum, item) => sum + item.priceKRW * item.quantity, 0);
-  const shipping = 35000;
-  const estimatedDuty = 12100;
-  const couponDiscount = 0;
-  const pointsDiscount = usePoints ? parseInt(usePoints) || 0 : 0;
-  const total = subtotal + shipping + estimatedDuty - couponDiscount - pointsDiscount;
+  const costs = useMemo(() => {
+    const subtotal = MOCK_ITEMS.reduce((sum, item) => sum + item.priceKRW * item.quantity, 0);
+    const totalWeightKg = MOCK_ITEMS.reduce((sum, item) => sum + item.weightKg * item.quantity, 0);
+    const ratePerKg = shippingMethod === 'AIR' ? AIR_RATE_PER_KG : SEA_RATE_PER_KG;
+    const shipping = Math.round(totalWeightKg * ratePerKg + BASE_SHIPPING_FEE);
+
+    const totalValueUsd = Math.round(subtotal / USD_TO_KRW);
+    const isDutyFree = totalValueUsd <= DUTY_FREE_LIMIT_USD;
+    const customsDuty = isDutyFree ? 0 : Math.round((subtotal + shipping) * CUSTOMS_DUTY_RATE);
+    const vat = isDutyFree ? 0 : Math.round((subtotal + shipping + customsDuty) * VAT_RATE);
+
+    const couponDiscount = 0;
+    const pointsDiscount = usePoints ? parseInt(usePoints) || 0 : 0;
+    const total = subtotal + shipping + customsDuty + vat - couponDiscount - pointsDiscount;
+
+    return {
+      subtotal,
+      shipping,
+      customsDuty,
+      vat,
+      couponDiscount,
+      pointsDiscount,
+      total,
+      totalValueUsd,
+      isDutyFree,
+      totalWeightKg,
+      deliveryDays: shippingMethod === 'AIR' ? '3-5일' : '10-14일',
+    };
+  }, [shippingMethod, usePoints]);
 
   const handleAgreeAll = () => {
     const next = !agreeAll;
     setAgreeAll(next);
     setAgreeOrder(next);
     setAgreeRefund(next);
+  };
+
+  const handleSubmit = async () => {
+    if (!agreeOrder || !agreeRefund) return;
+    setIsSubmitting(true);
+    // Simulate payment processing
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    router.push('/checkout/success');
   };
 
   return (
@@ -154,7 +197,59 @@ export default function CheckoutPage() {
           )}
         </section>
 
-        {/* Section 3: 국제배송 안내 */}
+        {/* Section 3: 배송 방법 선택 */}
+        <section className="bg-white rounded-2xl p-5 shadow-soft">
+          <h2 className="font-heading font-bold text-base mb-4 flex items-center gap-2">
+            <span className="material-symbols-outlined text-primary text-[20px]">local_shipping</span>
+            배송 방법 선택
+          </h2>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => setShippingMethod('AIR')}
+              className={cn(
+                'p-4 rounded-xl border-2 transition-all duration-200 text-left',
+                shippingMethod === 'AIR'
+                  ? 'border-primary bg-primary/5'
+                  : 'border-outline-variant/30 hover:border-outline-variant'
+              )}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <span className="material-symbols-outlined text-[24px] text-primary">flight</span>
+                <span className="font-bold text-sm text-on-surface">항공 특송</span>
+              </div>
+              <p className="text-xs text-on-surface-variant">3-5일 소요</p>
+              <p className="text-sm font-semibold text-on-surface mt-1">
+                {Math.round(costs.totalWeightKg * AIR_RATE_PER_KG + BASE_SHIPPING_FEE).toLocaleString()}원
+              </p>
+              <span className="inline-block mt-2 px-2 py-0.5 rounded bg-secondary/10 text-secondary text-[10px] font-semibold">
+                빠른 배송
+              </span>
+            </button>
+            <button
+              onClick={() => setShippingMethod('SEA')}
+              className={cn(
+                'p-4 rounded-xl border-2 transition-all duration-200 text-left',
+                shippingMethod === 'SEA'
+                  ? 'border-primary bg-primary/5'
+                  : 'border-outline-variant/30 hover:border-outline-variant'
+              )}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <span className="material-symbols-outlined text-[24px] text-tertiary">sailing</span>
+                <span className="font-bold text-sm text-on-surface">해운 일반</span>
+              </div>
+              <p className="text-xs text-on-surface-variant">10-14일 소요</p>
+              <p className="text-sm font-semibold text-on-surface mt-1">
+                {Math.round(costs.totalWeightKg * SEA_RATE_PER_KG + BASE_SHIPPING_FEE).toLocaleString()}원
+              </p>
+              <span className="inline-block mt-2 px-2 py-0.5 rounded bg-tertiary/10 text-tertiary text-[10px] font-semibold">
+                경제적
+              </span>
+            </button>
+          </div>
+        </section>
+
+        {/* Section 4: 국제배송 안내 */}
         <section className="bg-gradient-to-r from-tertiary/5 to-tertiary/10 rounded-2xl p-5 border border-tertiary/20">
           <h2 className="font-heading font-bold text-sm text-tertiary mb-4 flex items-center gap-2">
             <span className="material-symbols-outlined text-[20px]">public</span>
@@ -181,11 +276,28 @@ export default function CheckoutPage() {
             ))}
           </div>
           <p className="text-[11px] text-on-surface-variant mt-3 text-center">
-            예상 소요기간: 해상운송 기준 7~14영업일
+            예상 소요기간: {shippingMethod === 'AIR' ? '항공 특송 기준 3~5영업일' : '해상운송 기준 10~14영업일'}
           </p>
         </section>
 
-        {/* Section 4: 결제 수단 */}
+        {/* Customs duty warning */}
+        {!costs.isDutyFree && (
+          <section className="bg-secondary/5 rounded-2xl p-4 border border-secondary/20">
+            <div className="flex items-start gap-3">
+              <span className="material-symbols-outlined text-secondary text-[24px] shrink-0">warning</span>
+              <div>
+                <p className="text-sm font-semibold text-on-surface">관부가세 부과 안내</p>
+                <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
+                  주문 금액이 미화 $150을 초과하여 관세({(CUSTOMS_DUTY_RATE * 100).toFixed(0)}%)와
+                  부가세({(VAT_RATE * 100).toFixed(0)}%)가 부과됩니다.
+                  예상 관부가세: <span className="font-bold text-on-surface">{(costs.customsDuty + costs.vat).toLocaleString()}원</span>
+                </p>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Section 5: 결제 수단 */}
         <section className="bg-white rounded-2xl p-5 shadow-soft">
           <h2 className="font-heading font-bold text-base mb-4 flex items-center gap-2">
             <span className="material-symbols-outlined text-primary text-[20px]">payments</span>
@@ -220,7 +332,7 @@ export default function CheckoutPage() {
           </div>
         </section>
 
-        {/* Section 5: 쿠폰/적립금 */}
+        {/* Section 6: 쿠폰/적립금 */}
         <section className="bg-white rounded-2xl p-5 shadow-soft">
           <h2 className="font-heading font-bold text-base mb-4 flex items-center gap-2">
             <span className="material-symbols-outlined text-primary text-[20px]">confirmation_number</span>
@@ -263,7 +375,7 @@ export default function CheckoutPage() {
           </div>
         </section>
 
-        {/* Section 6: 최종 결제 금액 */}
+        {/* Section 7: 최종 결제 금액 */}
         <section className="bg-white rounded-2xl p-5 shadow-soft">
           <h2 className="font-heading font-bold text-base mb-4 flex items-center gap-2">
             <span className="material-symbols-outlined text-primary text-[20px]">receipt_long</span>
@@ -272,40 +384,62 @@ export default function CheckoutPage() {
           <div className="space-y-2.5">
             <div className="flex justify-between text-sm">
               <span className="text-on-surface-variant">상품 금액</span>
-              <span className="text-on-surface">{subtotal.toLocaleString()}원</span>
+              <span className="text-on-surface">{costs.subtotal.toLocaleString()}원</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-on-surface-variant">국제배송비</span>
-              <span className="text-on-surface">{shipping.toLocaleString()}원</span>
+              <span className="text-on-surface-variant flex items-center gap-1">
+                배송비
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant">
+                  {shippingMethod === 'AIR' ? '항공' : '해운'}
+                </span>
+              </span>
+              <span className="text-on-surface">{costs.shipping.toLocaleString()}원</span>
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-on-surface-variant">예상 관부가세</span>
-              <span className="text-on-surface">{estimatedDuty.toLocaleString()}원</span>
-            </div>
-            {couponDiscount > 0 && (
+            {costs.customsDuty > 0 && (
               <div className="flex justify-between text-sm">
-                <span className="text-on-surface-variant">쿠폰 할인</span>
-                <span className="text-primary">-{couponDiscount.toLocaleString()}원</span>
+                <span className="text-on-surface-variant">예상 관세 (8%)</span>
+                <span className="text-on-surface">{costs.customsDuty.toLocaleString()}원</span>
               </div>
             )}
-            {pointsDiscount > 0 && (
+            {costs.vat > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-on-surface-variant">예상 부가세 (10%)</span>
+                <span className="text-on-surface">{costs.vat.toLocaleString()}원</span>
+              </div>
+            )}
+            {costs.isDutyFree && (
+              <div className="flex justify-between text-sm">
+                <span className="text-on-surface-variant">관부가세</span>
+                <span className="text-green-600 font-medium">면세 (US${costs.totalValueUsd} / $150 이하)</span>
+              </div>
+            )}
+            {costs.couponDiscount > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-on-surface-variant">쿠폰 할인</span>
+                <span className="text-primary">-{costs.couponDiscount.toLocaleString()}원</span>
+              </div>
+            )}
+            {costs.pointsDiscount > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-on-surface-variant">적립금 할인</span>
-                <span className="text-primary">-{pointsDiscount.toLocaleString()}원</span>
+                <span className="text-primary">-{costs.pointsDiscount.toLocaleString()}원</span>
               </div>
             )}
             <div className="border-t border-outline-variant/30 pt-3 mt-3">
               <div className="flex justify-between items-center">
                 <span className="font-bold text-base text-on-surface">총 결제 금액</span>
                 <span className="font-heading font-extrabold text-xl text-primary">
-                  {total.toLocaleString()}원
+                  {costs.total.toLocaleString()}원
                 </span>
               </div>
+              <p className="text-[10px] text-on-surface-variant mt-1 text-right">
+                VAT 포함 | 예상 배송 {costs.deliveryDays}
+              </p>
             </div>
           </div>
         </section>
 
-        {/* Section 7: Terms */}
+        {/* Section 8: Terms */}
         <section className="bg-white rounded-2xl p-5 shadow-soft">
           <label className="flex items-center gap-3 cursor-pointer pb-3 mb-3 border-b border-outline-variant/20">
             <button
@@ -345,15 +479,23 @@ export default function CheckoutPage() {
       <div className="fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-outline-variant/30 shadow-strong">
         <div className="max-w-3xl mx-auto px-4 py-3">
           <button
-            disabled={!agreeOrder || !agreeRefund}
+            disabled={!agreeOrder || !agreeRefund || isSubmitting}
+            onClick={handleSubmit}
             className={cn(
-              'w-full h-13 py-3.5 rounded-xl font-bold text-base text-white transition-all duration-200',
-              agreeOrder && agreeRefund
+              'w-full h-13 py-3.5 rounded-xl font-bold text-base text-white transition-all duration-200 flex items-center justify-center gap-2',
+              agreeOrder && agreeRefund && !isSubmitting
                 ? 'bg-gradient-to-r from-primary to-primary-container hover:shadow-medium active:scale-[0.98]'
                 : 'bg-outline-variant/60 cursor-not-allowed'
             )}
           >
-            {total.toLocaleString()}원 결제하기
+            {isSubmitting ? (
+              <>
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                결제 처리 중...
+              </>
+            ) : (
+              `${costs.total.toLocaleString()}원 결제하기`
+            )}
           </button>
         </div>
       </div>
