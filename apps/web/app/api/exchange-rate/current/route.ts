@@ -1,17 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
-    const rate = 180;
-    const currency = 'KRW';
-    const base = 'CNY';
-    const updatedAt = new Date().toISOString();
+    // Try to fetch real exchange rate from free API
+    let rate = 190.5; // fallback
+    let source = 'fallback';
+
+    try {
+      const res = await fetch('https://open.er-api.com/v6/latest/CNY', {
+        next: { revalidate: 300 } // cache 5 minutes
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.rates?.KRW) {
+          rate = Math.round(json.rates.KRW * 100) / 100;
+          source = 'open.er-api.com';
+        }
+      }
+    } catch {
+      // use fallback
+    }
 
     return NextResponse.json({
       rate,
-      currency,
-      base,
-      updatedAt,
+      currency: 'KRW',
+      base: 'CNY',
+      source,
+      updatedAt: new Date().toISOString(),
     });
   } catch (error) {
     console.error('Error in /api/exchange-rate/current:', error);

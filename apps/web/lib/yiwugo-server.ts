@@ -1,14 +1,17 @@
 import axios from 'axios';
 
-// In-memory token cache
+// In-memory token cache (persists within serverless function warm instance)
 let cachedToken: { token: string; expiresAt: number } | null = null;
 
 const API_BASE = process.env.YIWUGO_API_BASE_URL || 'https://www.yiwugo.com';
+// Test credentials from Yiwugo Open Platform docs (override via env vars on production)
 const CLIENT_ID = process.env.YIWUGO_CLIENT_ID || '';
 const CLIENT_SECRET = process.env.YIWUGO_CLIENT_SECRET || '';
 
 /**
- * 1. POST /oauth/token - Get OAuth token
+ * 1. POST /oauth/token - Get OAuth token (client_credentials grant)
+ * Docs: Authorization header = Basic base64("clientId:clientSecret")
+ * Query: grant_type=client_credentials&client_id=<clientId>
  */
 async function getToken(): Promise<string> {
   if (cachedToken && Date.now() < cachedToken.expiresAt) {
@@ -18,18 +21,26 @@ async function getToken(): Promise<string> {
   const auth = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64');
   const response = await axios.post(`${API_BASE}/oauth/token`, null, {
     params: { grant_type: 'client_credentials', client_id: CLIENT_ID },
-    headers: { Authorization: `Basic ${auth}` },
+    headers: {
+      Authorization: `Basic ${auth}`,
+      Accept: 'application/json',
+    },
     timeout: 10000,
   });
 
-  const token = response.data?.data?.accessToken;
-  const expiresIn = response.data?.data?.expiresIn || 20000;
+  const body = response.data;
+  const token = body?.data?.accessToken;
+  const expiresIn = body?.data?.expiresIn || 20000; // seconds
   if (!token) throw new Error('Failed to get Yiwugo token');
 
+  // Cache with 60s safety margin
   cachedToken = { token, expiresAt: Date.now() + (expiresIn - 60) * 1000 };
   return token;
 }
 
+/**
+ * Generic GET request with OAuth token in query params
+ */
 async function apiGet(path: string, params: Record<string, string> = {}): Promise<any> {
   const token = await getToken();
   const response = await axios.get(`${API_BASE}${path}`, {
@@ -40,8 +51,12 @@ async function apiGet(path: string, params: Record<string, string> = {}): Promis
   return response.data;
 }
 
+// ─── 商铺 (Shop) APIs ───────────────────────────────────────
+
 /**
  * 2. GET /open/cn_shop/list - Shop search
+ * Params: q, page, number, subMarket, subFloor, type=2 (required)
+ * Response: data.num (total), data.list (shops array)
  */
 export async function searchShops(params: {
   q?: string; page?: number; number?: number;
@@ -60,6 +75,8 @@ export async function searchShops(params: {
 
 /**
  * 3. GET /open/cn_shop/detail - Shop detail
+ * Params: shopId (required)
+ * Response: data.{ liveList, loginId, LicenseImg, showroom, picCount, productCount, ... }
  */
 export async function getShopDetail(shopId: string) {
   const data = await apiGet('/open/cn_shop/detail', { shopId });
@@ -68,14 +85,21 @@ export async function getShopDetail(shopId: string) {
 
 /**
  * 4. GET /open/cn_shop/shopCategorizeNum - Shop internal category counts
+ * Params: shopId (required)
+ * Response: data.data.typeProducts[] — NOTE: double nested!
+ *   Each item: { defineType (category id), productNums (count) }
  */
 export async function getShopCategorizeNum(shopId: string) {
   const data = await apiGet('/open/cn_shop/shopCategorizeNum', { shopId });
-  return data?.data ?? { typeProducts: [] };
+  // Response structure: { code, message, data: { code, data: { typeProducts }, message } }
+  return data?.data?.data ?? { typeProducts: [] };
 }
 
 /**
  * 5. GET /open/cn_shop/shopSearch - Shop internal product search
+ * Params: shopId, productLable, dt, st (sort), keyword, cpage, pagesize
+ *   st: 1=newest, 9=sales, 4=priceAsc, 3=priceDesc
+ * Response: data.{ pageSize, shopName, productdetaillist[] }
  */
 export async function searchShopProducts(params: {
   shopId: string; keyword?: string; productLable?: string;
@@ -97,8 +121,16 @@ export async function searchShopProducts(params: {
   };
 }
 
+// ─── 商品 (Product) APIs ────────────────────────────────────
+
 /**
  * 6. GET /open/cn_product/list - Product search
+ * Params: q (keyword), cpage, pageSize, m (market), f (floor), shopId,
+ *   productLable (112=dropship, 113=print, 2=export, 4=import, 1=hot),
+ *   beginNumber (MOQ), stp (min price), edp (max price),
+ *   st (sort: 9=sales desc, 3=price desc, 4=price asc, 11=MOQ asc),
+ *   goodLabelFlag (1=featured), onlineOrderFlag (1=online purchase)
+ * Response: data.{ numfound, adShopTreoughTrainList[] }
  */
 export async function searchProducts(params: {
   q?: string; cpage?: number; pageSize?: number;
@@ -131,14 +163,22 @@ export async function searchProducts(params: {
 
 /**
  * 7. GET /open/cn_product/detail - Product detail
+ * Params: productId (required)
+ * Response: data.{ dealQuantitys, exchangeService, defaultFreight, loginId,
+ *   smallNum (MOQ), totalprice (price in CNY), propertyList[], ... }
  */
 export async function getProductDetail(productId: string) {
   const data = await apiGet('/open/cn_product/detail', { productId });
   return data?.data ?? null;
 }
 
+// ─── 常用 (Common) APIs ─────────────────────────────────────
+
 /**
  * 8. GET /open/categorize/product - Product categories
+ * Params: upperType (optional - if empty returns large categories, if set returns subcategories),
+ *   webType: cn/en (required)
+ * Response: data.list[] — each: { img, typeUrl, upperType, rank, typeId, id, productTypeList }
  */
 export async function getCategories(upperType?: string, webType: string = 'cn') {
   const query: Record<string, string> = { webType };
@@ -149,7 +189,9 @@ export async function getCategories(upperType?: string, webType: string = 'cn') 
 }
 
 /**
- * 9. GET /open/categorize/market - Market list
+ * 9. GET /open/categorize/market - Market classification list
+ * Params: access_token only
+ * Response: data.{ marketList[]: { marketEnName, marketCode } }
  */
 export async function getMarkets() {
   const data = await apiGet('/open/categorize/market', {});
@@ -157,9 +199,9 @@ export async function getMarkets() {
 }
 
 /**
- * Helper: convert CNY price (in 分) to KRW
+ * Helper: convert CNY price to KRW
+ * Yiwugo product list uses sellPrice in 分 (cents), detail uses totalprice in 元 (yuan)
  */
-export function convertPrice(sellPriceFen: number, exchangeRate: number = 180, commission: number = 0.05): number {
-  const cny = sellPriceFen / 100;
-  return Math.round(cny * exchangeRate * (1 + commission));
+export function convertPrice(priceCny: number, exchangeRate: number = 190, commission: number = 0.05): number {
+  return Math.round(priceCny * exchangeRate * (1 + commission));
 }
