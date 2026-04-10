@@ -1,0 +1,185 @@
+{
+  "searchResponse": {
+    "status": "ok",
+    "total": 1582,
+    "page": 1,
+    "page_size": 20,
+    "items": [
+      {
+        "num_iid": "YW202403180001",
+        "title": "2024新款时尚女包手提包大容量单肩包PU皮百搭斜挎包",
+        "price": "25.00",
+        "pic_url": "https://img.yiwugo.com/img/upload/2024/03/18/bag_001.jpg",
+        "detail_url": "https://www.yiwugo.com/product/YW202403180001.html",
+        "props_name": "颜色:黑色,棕色,红色,米白;尺寸:大号,中号",
+        "seller_id": "S88001",
+        "seller_nick": "义乌鑫旺箱包",
+        "shop_name": "鑫旺箱包批发商行",
+        "booth_number": "1区-A-001",
+        "category_id": "10001",
+        "sub_category_id": "10001003",
+        "min_order_qty": 2,
+        "stock": 5200,
+        "weight": "0.45kg",
+        "item_imgs": [
+          { "url": "https://img.yiwugo.com/img/upload/2024/03/18/bag_001.jpg" },
+          { "url": "https://img.yiwugo.com/img/upload/2024/03/18/bag_001_2.jpg" },
+          { "url": "https://img.yiwugo.com/img/upload/2024/03/18/bag_001_3.jpg" }
+        ],
+        "sales_count": 12580,
+        "view_count": 98200
+      },
+      {
+        "num_iid": "YW202403220015",
+        "title": "304不锈钢保温杯便携水杯大容量500ml商务办公杯子",
+        "price": "8.50",
+        "pic_url": "https://img.yiwugo.com/img/upload/2024/03/22/cup_001.jpg",
+        "detail_url": "https://www.yiwugo.com/product/YW202403220015.html",
+        "props_name": "颜色:银色,黑色,蓝色;容量:350ml,500ml,750ml",
+        "seller_id": "S88012",
+        "seller_nick": "永康杯业直销",
+        "shop_name": "永康市宏达杯业有限公司",
+        "booth_number": "2区-B-015",
+        "category_id": "20003",
+        "sub_category_id": "20003007",
+        "min_order_qty": 10,
+        "stock": 32000,
+        "weight": "0.32kg",
+        "item_imgs": [
+          { "url": "https://img.yiwugo.com/img/upload/2024/03/22/cup_001.jpg" },
+          { "url": "https://img.yiwugo.com/img/upload/2024/03/22/cup_001_2.jpg" }
+        ],
+        "sales_count": 45800,
+        "view_count": 156000
+      },
+      {
+        "num_iid": "YW202404010032",
+        "title": "手机壳硅胶防摔苹果iPhone15ProMax透明保护套防震",
+        "price": "2.80",
+        "pic_url": "https://img.yiwugo.com/img/upload/2024/04/01/case_001.jpg",
+        "detail_url": "https://www.yiwugo.com/product/YW202404010032.html",
+        "props_name": "型号:iPhone15,iPhone15Pro,iPhone15ProMax;类型:透明,磨砂",
+        "seller_id": "S88045",
+        "seller_nick": "数码配件工厂店",
+        "shop_name": "义乌数码配件批发",
+        "booth_number": "3区-C-088",
+        "category_id": "30002",
+        "sub_category_id": "30002001",
+        "min_order_qty": 50,
+        "stock": 150000,
+        "weight": "0.035kg",
+        "item_imgs": [
+          { "url": "https://img.yiwugo.com/img/upload/2024/04/01/case_001.jpg" }
+        ],
+        "sales_count": 238000,
+        "view_count": 520000
+      },
+      {
+        "num_iid": "YW202403280099",
+        "title": "儿童夏季纯棉T恤短袖圆领卡通印花男女童装批发",
+        "price": "12.00",
+        "pic_url": "https://img.yiwugo.com/img/upload/2024/03/28/kids_tshirt_001.jpg",
+        "detail_url": "https://www.yiwugo.com/product/YW202403280099.html",
+        "props_name": "颜色:白色,蓝色,粉红,黄色;尺码:90,100,110,120,130,140",
+        "seller_id": "S88067",
+        "seller_nick": "童装批发小王",
+        "shop_name": "义乌童装批发城",
+        "booth_number": "5区-E-022",
+        "category_id": "50001",
+        "sub_category_id": "50001002",
+        "min_order_qty": 5,
+        "stock": 28000,
+        "weight": "0.12kg",
+        "item_imgs": [
+          { "url": "https://img.yiwugo.com/img/upload/2024/03/28/kids_tshirt_001.jpg" },
+          { "url": "https://img.yiwugo.com/img/upload/2024/03/28/kids_tshirt_001_2.jpg" }
+        ],
+        "sales_count": 68900,
+        "view_count": 215000
+      },
+      {
+        "num_iid": "YW202404050055",
+        "title": "环保无纺布购物袋定制LOGO手提袋广告袋子印刷批发",
+        "price": "0.65",
+        "pic_url": "https://img.yiwugo.com/img/upload/2024/04/05/bag_eco_001.jpg",
+        "detail_url": "https://www.yiwugo.com/product/YW202404050055.html",
+        "props_name": "颜色:白色,红色,蓝色,绿色,黄色;尺寸:小号,中号,大号",
+        "seller_id": "S88023",
+        "seller_nick": "义乌环保袋厂家",
+        "shop_name": "义乌市绿源包装有限公司",
+        "booth_number": "1区-D-045",
+        "category_id": "10005",
+        "sub_category_id": "10005001",
+        "min_order_qty": 500,
+        "stock": 500000,
+        "weight": "0.028kg",
+        "item_imgs": [
+          { "url": "https://img.yiwugo.com/img/upload/2024/04/05/bag_eco_001.jpg" }
+        ],
+        "sales_count": 1250000,
+        "view_count": 890000
+      }
+    ]
+  },
+  "productDetailResponse": {
+    "status": "ok",
+    "item": {
+      "num_iid": "YW202403180001",
+      "title": "2024新款时尚女包手提包大容量单肩包PU皮百搭斜挎包",
+      "price": "25.00",
+      "pic_url": "https://img.yiwugo.com/img/upload/2024/03/18/bag_001.jpg",
+      "detail_url": "https://www.yiwugo.com/product/YW202403180001.html",
+      "props_name": "颜色:黑色,棕色,红色,米白;尺寸:大号,中号",
+      "seller_id": "S88001",
+      "seller_nick": "义乌鑫旺箱包",
+      "shop_name": "鑫旺箱包批发商行",
+      "booth_number": "1区-A-001",
+      "category_id": "10001",
+      "sub_category_id": "10001003",
+      "min_order_qty": 2,
+      "stock": 5200,
+      "weight": "0.45kg",
+      "desc": "<div class='detail-desc'><p>2024年最新款时尚女包，采用优质PU皮革，手感柔软，经久耐用。</p><p>大容量设计，可放入A4文件、iPad、水杯等日常物品。</p><p>可手提、单肩、斜挎，一包多用，百搭各种穿搭风格。</p><p>厂家直销，一件代发，7天无理由退货。</p><img src='https://img.yiwugo.com/img/upload/2024/03/18/bag_001_detail1.jpg' /><img src='https://img.yiwugo.com/img/upload/2024/03/18/bag_001_detail2.jpg' /></div>",
+      "item_imgs": [
+        { "url": "https://img.yiwugo.com/img/upload/2024/03/18/bag_001.jpg" },
+        { "url": "https://img.yiwugo.com/img/upload/2024/03/18/bag_001_2.jpg" },
+        { "url": "https://img.yiwugo.com/img/upload/2024/03/18/bag_001_3.jpg" },
+        { "url": "https://img.yiwugo.com/img/upload/2024/03/18/bag_001_4.jpg" }
+      ],
+      "prop_imgs": [
+        { "properties": "颜色:黑色", "url": "https://img.yiwugo.com/img/upload/2024/03/18/bag_001_black.jpg" },
+        { "properties": "颜色:棕色", "url": "https://img.yiwugo.com/img/upload/2024/03/18/bag_001_brown.jpg" },
+        { "properties": "颜色:红色", "url": "https://img.yiwugo.com/img/upload/2024/03/18/bag_001_red.jpg" },
+        { "properties": "颜色:米白", "url": "https://img.yiwugo.com/img/upload/2024/03/18/bag_001_beige.jpg" }
+      ],
+      "sku_list": [
+        { "sku_id": "SKU001001", "properties_name": "颜色:黑色;尺寸:大号", "price": "25.00", "quantity": 1500 },
+        { "sku_id": "SKU001002", "properties_name": "颜色:黑色;尺寸:中号", "price": "22.00", "quantity": 1200 },
+        { "sku_id": "SKU001003", "properties_name": "颜色:棕色;尺寸:大号", "price": "25.00", "quantity": 800 },
+        { "sku_id": "SKU001004", "properties_name": "颜色:棕色;尺寸:中号", "price": "22.00", "quantity": 700 },
+        { "sku_id": "SKU001005", "properties_name": "颜色:红色;尺寸:大号", "price": "28.00", "quantity": 500 },
+        { "sku_id": "SKU001006", "properties_name": "颜色:米白;尺寸:大号", "price": "25.00", "quantity": 500 }
+      ],
+      "sales_count": 12580,
+      "view_count": 98200
+    }
+  },
+  "shopInfoResponse": {
+    "status": "ok",
+    "seller": {
+      "seller_id": "S88001",
+      "shop_name": "鑫旺箱包批发商行",
+      "booth_number": "1区-A-001",
+      "logo_url": "https://img.yiwugo.com/img/shop/S88001/logo.jpg",
+      "panorama_url": "https://img.yiwugo.com/img/shop/S88001/panorama.jpg",
+      "description": "义乌国际商贸城一区箱包专区，主营女包、手提包、斜挎包、双肩包。厂家直销，支持一件代发，混批。10年老店，品质保证。",
+      "product_count": 328,
+      "response_rate": 96.5,
+      "years_in_business": 10,
+      "is_verified": true,
+      "categories": ["女包", "手提包", "斜挎包", "双肩包", "钱包"],
+      "contact_phone": "0579-85XXXXXX",
+      "contact_wechat": "xinwang_bags"
+    }
+  }
+}

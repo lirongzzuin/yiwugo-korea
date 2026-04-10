@@ -1,0 +1,32 @@
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  output: 'standalone',
+  transpilePackages: ['@yiwugo/shared', '@yiwugo/ui'],
+  images: {
+    remotePatterns: [
+      { protocol: 'https', hostname: '**.yiwugo.com' },
+      { protocol: 'https', hostname: '**.googleusercontent.com' },
+      { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
+      { protocol: 'https', hostname: 'picsum.photos' },
+    ],
+  },
+  env: {
+    NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL || 'https://yiwugo-korea.vercel.app',
+    NEXT_PUBLIC_SITE_NAME: process.env.NEXT_PUBLIC_SITE_NAME || '이우고 코리아',
+  },
+  // Only add API rewrite when a real API URL is configured
+  ...(process.env.NEXT_PUBLIC_API_URL
+    ? {
+        async rewrites() {
+          return [
+            {
+              source: '/api/:path*',
+              destination: `${process.env.NEXT_PUBLIC_API_URL}/:path*`,
+            },
+          ];
+        },
+      }
+    : {}),
+};
+
+export default nextConfig;

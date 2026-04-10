@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "이우고 코리아",
+    "slug": "yiwugo-korea",
+    "version": "1.0.0",
+    "scheme": "yiwugo",
+    "platforms": ["ios", "android"],
+    "ios": { "bundleIdentifier": "com.yiwugo.korea" },
+    "android": { "package": "com.yiwugo.korea" },
+    "plugins": ["expo-router", "expo-camera", "expo-notifications"]
+  }
+}
