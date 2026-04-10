@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as yiwugo from '../../../../lib/yiwugo-server';
 import { mapProduct } from '../../utils';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(_request: NextRequest) {
   try {
     const result = await yiwugo.searchProducts({
