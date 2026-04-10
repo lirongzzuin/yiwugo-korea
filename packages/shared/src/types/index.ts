@@ -1,5 +1,7 @@
 export * from './product';
 export * from './shop';
+export * from './category';
+export * from './auth';
 export * from './user';
 export * from './order';
 export * from './payment';

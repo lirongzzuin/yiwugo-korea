@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@prisma/prisma.service';
 import { RedisService } from '@common/services/redis.service';
+import { YiwugoApiClient } from '@modules/yiwugo/yiwugo-api.client';
 
 export interface CategoryTreeNode {
   id: string;
@@ -25,6 +26,7 @@ export class CategoryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redisService: RedisService,
+    private readonly yiwugoApiClient: YiwugoApiClient,
   ) {}
 
   /**
@@ -208,5 +210,158 @@ export class CategoryService {
         children: [],
       })),
     }));
+  }
+
+  /**
+   * Sync categories from Yiwugo API
+   * Fetches top-level and sub-categories, then upserts into database
+   */
+  async syncFromYiwugo(): Promise<{ created: number; updated: number }> {
+    let created = 0;
+    let updated = 0;
+
+    try {
+      // Fetch top-level categories (no upperType parameter)
+      this.logger.log('Fetching top-level categories from Yiwugo...');
+      const topCategories = await this.yiwugoApiClient.getCategories();
+
+      if (!Array.isArray(topCategories)) {
+        throw new Error('Invalid categories response');
+      }
+
+      // Process each top-level category
+      for (const topCat of topCategories) {
+        // Extract data from top-level category
+        const code = String(topCat.id || topCat.typeId);
+        const nameZh = topCat.type || topCat.typename || '';
+        const nameEn = topCat.entype || '';
+        const slug = this.generateSlug(nameEn || nameZh);
+        const icon = topCat.icon || null;
+        const sortOrder = topCat.rank || 0;
+
+        // Check if exists before upsert for counting
+        const existingTop = await this.prisma.category.findUnique({ where: { code } });
+
+        // Upsert top-level category
+        const topResult = await this.prisma.category.upsert({
+          where: { code },
+          update: {
+            nameZh,
+            nameKo: nameZh, // Use Chinese name as fallback for Korean
+            icon,
+            slug,
+            sortOrder,
+            isActive: true,
+          },
+          create: {
+            code,
+            nameZh,
+            nameKo: nameZh, // Use Chinese name as fallback for Korean
+            icon,
+            slug,
+            sortOrder,
+            isActive: true,
+          },
+        });
+
+        if (existingTop) updated++;
+        else created++;
+
+        this.logger.debug(`Synced top-level category: ${code} (${nameZh})`);
+
+        // Fetch sub-categories for this top-level category
+        try {
+          this.logger.debug(`Fetching sub-categories for parent: ${code}`);
+          const subCategories = await this.yiwugoApiClient.getCategories(code);
+
+          if (!Array.isArray(subCategories)) {
+            this.logger.warn(`Invalid sub-categories response for parent: ${code}`);
+            continue;
+          }
+
+          // Process each sub-category
+          for (const subCat of subCategories) {
+            const subCode = String(subCat.id || subCat.typeId);
+            const subNameZh = subCat.type || subCat.typename || '';
+            const subNameEn = subCat.entype || '';
+            const subSlug = this.generateSlug(subNameEn || subNameZh);
+            const subIcon = subCat.icon || null;
+            const subSortOrder = subCat.rank || 0;
+
+            // Check if exists before upsert for counting
+            const existingSub = await this.prisma.category.findUnique({ where: { code: subCode } });
+
+            // Upsert sub-category
+            await this.prisma.category.upsert({
+              where: { code: subCode },
+              update: {
+                nameZh: subNameZh,
+                nameKo: subNameZh, // Use Chinese name as fallback for Korean
+                icon: subIcon,
+                slug: subSlug,
+                parentId: topResult.id,
+                sortOrder: subSortOrder,
+                isActive: true,
+              },
+              create: {
+                code: subCode,
+                nameZh: subNameZh,
+                nameKo: subNameZh, // Use Chinese name as fallback for Korean
+                icon: subIcon,
+                slug: subSlug,
+                parentId: topResult.id,
+                sortOrder: subSortOrder,
+                isActive: true,
+              },
+            });
+
+            if (existingSub) updated++;
+            else created++;
+
+            this.logger.debug(`Synced sub-category: ${subCode} (${subNameZh}) under parent: ${code}`);
+          }
+        } catch (error) {
+          this.logger.error(`Failed to fetch sub-categories for parent: ${code}`, error);
+          // Continue with next top-level category
+        }
+      }
+
+      // Invalidate cache
+      await this.invalidateCache();
+
+      this.logger.log(
+        `Category sync completed. Created: ${created}, Updated: ${updated}`,
+      );
+      return { created, updated };
+    } catch (error) {
+      this.logger.error('Category sync failed', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Generate a slug from a name
+   * Converts to lowercase and replaces spaces with hyphens
+   */
+  private generateSlug(name: string): string {
+    return name
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9\-]/g, '')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+  }
+
+  /**
+   * Invalidate the categories tree cache
+   */
+  private async invalidateCache(): Promise<void> {
+    try {
+      await this.redisService.del(CACHE_KEY);
+      this.logger.debug('Category cache invalidated');
+    } catch {
+      // ignore cache errors
+    }
   }
 }

@@ -70,10 +70,18 @@ function getMockData(url: string, _method: string): any {
     return { data: MOCK_CATEGORIES, total: MOCK_CATEGORIES.length };
   }
 
-  // Products
-  if (path === '/products') {
+  // Products / search
+  if (path === '/products' || path === '/products/search') {
     const products = Array.from({ length: 24 }, (_, i) => generateMockProduct(i));
     return { data: products, total: products.length, page: 1, pageSize: 24 };
+  }
+  if (path === '/products/featured') {
+    const products = Array.from({ length: 8 }, (_, i) => generateMockProduct(i));
+    return { data: products, total: products.length };
+  }
+  if (path === '/products/popular') {
+    const products = Array.from({ length: 12 }, (_, i) => generateMockProduct(i + 100));
+    return { data: products, total: products.length };
   }
   const productMatch = path.match(/^\/products\/([\w-]+)$/);
   if (productMatch) {
@@ -87,12 +95,6 @@ function getMockData(url: string, _method: string): any {
       shop: MOCK_SHOPS[idx % MOCK_SHOPS.length],
       images: Array.from({ length: 4 }, (_, i) => `https://picsum.photos/seed/yiwu${idx}_${i}/800/800`),
     };
-  }
-
-  // Search
-  if (path === '/search') {
-    const products = Array.from({ length: 24 }, (_, i) => generateMockProduct(i + 50));
-    return { data: products, total: products.length, page: 1, pageSize: 24 };
   }
 
   // Orders
@@ -177,6 +179,11 @@ function getMockData(url: string, _method: string): any {
   // Settings
   if (path === '/settings') {
     return { commissionRate: 8, exchangeMargin: 1.5, pointsEarnRate: 1 };
+  }
+
+  // Admin sync endpoints
+  if (path.startsWith('/admin/sync')) {
+    return { success: true, message: 'Sync completed in demo mode' };
   }
 
   // Admin stats
@@ -345,5 +352,143 @@ function extractApiError(error: AxiosError<ApiError>): ApiError {
     message: '네트워크 연결을 확인해주세요.',
   };
 }
+
+/**
+ * High-level API interface for the application
+ * Provides typed methods that map to backend endpoints
+ */
+export const api = {
+  // Product endpoints
+  products: {
+    /**
+     * Search products with filters
+     * GET /products/search?q=&page=&pageSize=&sortBy=&minPrice=&maxPrice=&categoryId=&shopId=
+     */
+    async search(params: {
+      q?: string;
+      page?: number;
+      pageSize?: number;
+      sortBy?: string;
+      minPrice?: number;
+      maxPrice?: number;
+      categoryId?: string;
+      shopId?: string;
+    }) {
+      const response = await apiClient.get('/products/search', { params });
+      return response.data;
+    },
+
+    /**
+     * Get featured products
+     * GET /products/featured
+     */
+    async getFeatured() {
+      const response = await apiClient.get('/products/featured');
+      return response.data;
+    },
+
+    /**
+     * Get popular products
+     * GET /products/popular?limit=
+     */
+    async getPopular(limit = 12) {
+      const response = await apiClient.get('/products/popular', { params: { limit } });
+      return response.data;
+    },
+
+    /**
+     * Get product detail
+     * GET /products/:id
+     */
+    async getDetail(id: string) {
+      const response = await apiClient.get(`/products/${id}`);
+      return response.data;
+    },
+  },
+
+  // Category endpoints
+  categories: {
+    /**
+     * Get all categories tree
+     * GET /categories
+     */
+    async getAll() {
+      const response = await apiClient.get('/categories');
+      return response.data;
+    },
+
+    /**
+     * Get category detail by slug
+     * GET /categories/:slug
+     */
+    async getBySlug(slug: string) {
+      const response = await apiClient.get(`/categories/${slug}`);
+      return response.data;
+    },
+  },
+
+  // Exchange rate endpoints
+  exchangeRate: {
+    /**
+     * Get current exchange rate
+     * GET /exchange-rate/current
+     */
+    async getCurrent() {
+      const response = await apiClient.get('/exchange-rate/current');
+      return response.data;
+    },
+
+    /**
+     * Get exchange rate history
+     * GET /exchange-rate/history?days=
+     */
+    async getHistory(days = 30) {
+      const response = await apiClient.get('/exchange-rate/history', { params: { days } });
+      return response.data;
+    },
+  },
+
+  // Admin sync endpoints (requires authentication + ADMIN role)
+  sync: {
+    /**
+     * Sync categories from Yiwugo
+     * POST /admin/sync/categories
+     */
+    async syncCategories() {
+      const response = await apiClient.post('/admin/sync/categories');
+      return response.data;
+    },
+
+    /**
+     * Sync products from Yiwugo by keyword
+     * POST /admin/sync/products
+     */
+    async syncProducts(keyword: string, page = 1) {
+      const response = await apiClient.post('/admin/sync/products', {
+        keyword,
+        page,
+      });
+      return response.data;
+    },
+
+    /**
+     * Sync specific product
+     * POST /admin/sync/products/:productId
+     */
+    async syncProduct(productId: string) {
+      const response = await apiClient.post(`/admin/sync/products/${productId}`);
+      return response.data;
+    },
+
+    /**
+     * Sync specific shop
+     * POST /admin/sync/shops/:shopId
+     */
+    async syncShop(shopId: string) {
+      const response = await apiClient.post(`/admin/sync/shops/${shopId}`);
+      return response.data;
+    },
+  },
+};
 
 export default apiClient;

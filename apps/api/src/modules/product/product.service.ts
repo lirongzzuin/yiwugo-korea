@@ -96,7 +96,7 @@ export class ProductService {
 
     // If no DB results and we have a keyword, try Yiwugo API
     if (items.length === 0 && q) {
-      return this.searchFromYiwugo(q, page, pageSize);
+      return this.syncFromYiwugo(q, page, pageSize);
     }
 
     const result: ProductSearchResult = {
@@ -118,7 +118,7 @@ export class ProductService {
     const cached = await this.getCache<Product>(cacheKey);
     if (cached) return cached;
 
-    // Try DB first
+    // Try DB first by ID
     const dbProduct = await this.prisma.product.findUnique({
       where: { id },
       include: { shop: true, category: true },
@@ -142,46 +142,10 @@ export class ProductService {
       return product;
     }
 
-    // Fallback: fetch from Yiwugo API
+    // Fallback: fetch from Yiwugo API and translate
     try {
       const rawProduct = await this.yiwugoApiClient.getProductDetail(id);
-      const rate = await this.exchangeRateService.getCurrentRate();
-      const titleKo = await this.translationService.translate(rawProduct.title);
-      const descKo = rawProduct.desc
-        ? await this.translationService.translateHtml(rawProduct.desc)
-        : undefined;
-
-      const priceCny = parseFloat(rawProduct.price);
-      const priceKrw = Math.round(priceCny * rate.rate);
-
-      const product: Product = {
-        id: rawProduct.num_iid,
-        titleOriginal: rawProduct.title,
-        titleKo,
-        descOriginal: rawProduct.desc,
-        descKo,
-        priceOriginalCny: rawProduct.price,
-        priceKrw: String(priceKrw),
-        minOrderQty: rawProduct.min_order_qty ?? 1,
-        stock: rawProduct.stock,
-        imageUrls: rawProduct.item_imgs?.map((img) => img.url) ?? [rawProduct.pic_url],
-        categoryId: rawProduct.category_id,
-        subCategoryId: rawProduct.sub_category_id,
-        shopId: rawProduct.seller_id,
-        shopName: rawProduct.shop_name,
-        detailUrl: rawProduct.detail_url,
-        weight: rawProduct.weight,
-        viewCount: rawProduct.view_count ?? 0,
-        salesCount: rawProduct.sales_count ?? 0,
-        wishlistCount: 0,
-        reviewCount: 0,
-        isActive: true,
-        isFeatured: false,
-        syncedAt: new Date().toISOString(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
+      const product = await this.convertYiwugoProductToProduct(rawProduct);
       await this.setCache(cacheKey, product, CACHE_TTL.PRODUCT_DETAIL);
       return product;
     } catch (error) {
@@ -261,98 +225,213 @@ export class ProductService {
   }
 
   /**
-   * Search products by image URL via Yiwugo API
+   * Search products by image URL via Yiwugo API (not yet implemented in YiwugoApiClient)
    */
   async searchByImage(imageUrl: string): Promise<Product[]> {
-    const rawProducts = await this.yiwugoApiClient.searchByImage(imageUrl);
-    const rate = await this.exchangeRateService.getCurrentRate();
-
-    const titles = rawProducts.map((p) => p.title);
-    const translatedTitles = await this.translationService.translateBatch(titles);
-
-    return rawProducts.map((raw, idx) => {
-      const priceCny = parseFloat(raw.price);
-      const priceKrw = Math.round(priceCny * rate.rate);
-
-      return {
-        id: raw.num_iid,
-        titleOriginal: raw.title,
-        titleKo: translatedTitles[idx],
-        priceOriginalCny: raw.price,
-        priceKrw: String(priceKrw),
-        minOrderQty: raw.min_order_qty ?? 1,
-        stock: raw.stock,
-        imageUrls: raw.item_imgs?.map((img) => img.url) ?? [raw.pic_url],
-        categoryId: raw.category_id,
-        shopId: raw.seller_id,
-        shopName: raw.shop_name,
-        detailUrl: raw.detail_url,
-        weight: raw.weight,
-        viewCount: raw.view_count ?? 0,
-        salesCount: raw.sales_count ?? 0,
-        wishlistCount: 0,
-        reviewCount: 0,
-        isActive: true,
-        isFeatured: false,
-        syncedAt: new Date().toISOString(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-    });
+    // This would require searchByImage method in YiwugoApiClient
+    // For now, return empty array
+    this.logger.warn('searchByImage not yet implemented');
+    return [];
   }
 
   // ── Private helpers ────────────────────────────────────────
 
   /**
-   * Search from Yiwugo API, translate and convert prices
+   * Sync products from Yiwugo API, translate, convert prices and store in DB
    */
-  private async searchFromYiwugo(
+  private async syncFromYiwugo(
     query: string,
     page: number,
     pageSize: number,
   ): Promise<ProductSearchResult> {
-    const rawProducts = await this.yiwugoApiClient.searchProducts(query, page, pageSize);
-    const rate = await this.exchangeRateService.getCurrentRate();
+    try {
+      // Search products via Yiwugo API
+      const searchResult = await this.yiwugoApiClient.searchProducts({
+        q: query,
+        page,
+        pageSize,
+      });
 
-    const titles = rawProducts.map((p) => p.title);
-    const translatedTitles = await this.translationService.translateBatch(titles);
+      const rawProducts = searchResult.products || [];
+      const total = searchResult.total || 0;
 
-    const items: Product[] = rawProducts.map((raw, idx) => {
-      const priceCny = parseFloat(raw.price);
-      const priceKrw = Math.round(priceCny * rate.rate);
+      if (rawProducts.length === 0) {
+        return { items: [], total: 0, page, pageSize };
+      }
+
+      // Translate titles in batch
+      const titles = rawProducts.map((p: any) => p.title || p.productName || '');
+      const translatedTitles = await this.translationService.translateBatch(titles);
+
+      // Convert to Product objects and store in DB
+      const items: Product[] = [];
+      const rate = await this.exchangeRateService.getCurrentRate();
+
+      for (let idx = 0; idx < rawProducts.length; idx++) {
+        const raw = rawProducts[idx];
+        const product = await this.convertYiwugoProductToProduct(
+          raw,
+          translatedTitles[idx],
+          rate.rate,
+        );
+
+        // Upsert into database
+        try {
+          const yiwugoId = raw.productId || raw.num_iid || String(idx);
+          await this.prisma.product.upsert({
+            where: { yiwugoId },
+            update: {
+              titleKo: product.titleKo,
+              titleOriginal: product.titleOriginal,
+              priceKrw: Number(product.priceKrw),
+              priceOriginalCny: Number(product.priceOriginalCny),
+              stock: product.stock,
+              imageUrls: product.imageUrls,
+              salesCount: product.salesCount,
+              viewCount: product.viewCount,
+              syncedAt: new Date(),
+            },
+            create: {
+              yiwugoId,
+              titleOriginal: product.titleOriginal,
+              titleKo: product.titleKo,
+              priceOriginalCny: Number(product.priceOriginalCny),
+              priceKrw: Number(product.priceKrw),
+              minOrderQty: product.minOrderQty,
+              stock: product.stock,
+              imageUrls: product.imageUrls,
+              detailUrl: product.detailUrl,
+              weight: product.weight,
+              viewCount: product.viewCount,
+              salesCount: product.salesCount,
+              isActive: true,
+              syncedAt: new Date(),
+            },
+          });
+        } catch (error) {
+          this.logger.error(`Failed to upsert product ${idx}`, error);
+          // Continue with next product
+        }
+
+        items.push(product);
+      }
 
       return {
-        id: raw.num_iid,
-        titleOriginal: raw.title,
-        titleKo: translatedTitles[idx],
-        priceOriginalCny: raw.price,
-        priceKrw: String(priceKrw),
-        minOrderQty: raw.min_order_qty ?? 1,
-        stock: raw.stock,
-        imageUrls: raw.item_imgs?.map((img) => img.url) ?? [raw.pic_url],
-        categoryId: raw.category_id,
-        shopId: raw.seller_id,
-        shopName: raw.shop_name,
-        detailUrl: raw.detail_url,
-        weight: raw.weight,
-        viewCount: raw.view_count ?? 0,
-        salesCount: raw.sales_count ?? 0,
-        wishlistCount: 0,
-        reviewCount: 0,
-        isActive: true,
-        isFeatured: false,
-        syncedAt: new Date().toISOString(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        items,
+        total,
+        page,
+        pageSize,
       };
-    });
+    } catch (error) {
+      this.logger.error(`Failed to sync products from Yiwugo for query="${query}"`, error);
+      return { items: [], total: 0, page, pageSize };
+    }
+  }
+
+  /**
+   * Convert Yiwugo API product to Product object
+   */
+  private async convertYiwugoProductToProduct(
+    rawProduct: any,
+    translatedTitle?: string,
+    exchangeRate?: number,
+  ): Promise<Product> {
+    const rate = exchangeRate ?? (await this.exchangeRateService.getCurrentRate()).rate;
+
+    // Handle price conversion from 分 (cents) if needed
+    let priceCny = 0;
+    if (rawProduct.price !== undefined) {
+      priceCny = typeof rawProduct.price === 'string'
+        ? parseFloat(rawProduct.price)
+        : Number(rawProduct.price);
+    }
+    // sellPrice from list API is in 分 (cents): value > 100 likely means cents
+    if (rawProduct.sellPrice !== undefined) {
+      const sellPrice = Number(rawProduct.sellPrice);
+      if (sellPrice > 100) {
+        priceCny = sellPrice / 100; // 分 → 元
+      } else {
+        priceCny = sellPrice;
+      }
+    }
+
+    const priceKrw = Math.round(priceCny * rate);
+
+    // Get title and translate if not provided
+    const titleOriginal = rawProduct.title || rawProduct.productName || '';
+    const titleKo = translatedTitle ||
+      (titleOriginal ? await this.translationService.translate(titleOriginal) : '');
+
+    // Get description and translate if provided
+    const descOriginal = rawProduct.description || rawProduct.desc || undefined;
+    const descKo = descOriginal
+      ? await this.translationService.translateHtml(descOriginal)
+      : undefined;
+
+    // Extract image URLs
+    const imageUrls = this.extractImageUrls(rawProduct);
 
     return {
-      items,
-      total: items.length,
-      page,
-      pageSize,
+      id: rawProduct.productId || rawProduct.num_iid || String(Math.random()),
+      titleOriginal,
+      titleKo,
+      descOriginal,
+      descKo,
+      priceOriginalCny: String(priceCny),
+      priceKrw: String(priceKrw),
+      minOrderQty: rawProduct.minOrder || rawProduct.min_order_qty || 1,
+      stock: rawProduct.stock || 0,
+      imageUrls,
+      categoryId: rawProduct.categoryId || rawProduct.category_id || undefined,
+      subCategoryId: rawProduct.subCategoryId || rawProduct.sub_category_id || undefined,
+      shopId: rawProduct.shopId || rawProduct.seller_id || undefined,
+      shopName: rawProduct.shopName || rawProduct.shop_name || undefined,
+      detailUrl: rawProduct.productUrl || rawProduct.detail_url || undefined,
+      weight: rawProduct.weight || undefined,
+      viewCount: rawProduct.viewCount || rawProduct.view_count || 0,
+      salesCount: rawProduct.salesCount || rawProduct.sales_count || 0,
+      wishlistCount: 0,
+      reviewCount: 0,
+      isActive: true,
+      isFeatured: false,
+      syncedAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
+  }
+
+  /**
+   * Extract image URLs from Yiwugo product object
+   * Handles multiple possible formats from the API
+   */
+  private extractImageUrls(rawProduct: any): string[] {
+    const images: string[] = [];
+
+    // Handle item_imgs array
+    if (Array.isArray(rawProduct.item_imgs)) {
+      rawProduct.item_imgs.forEach((img: any) => {
+        if (img.url) images.push(img.url);
+      });
+    }
+
+    // Handle sdiProductsPicList array
+    if (Array.isArray(rawProduct.sdiProductsPicList)) {
+      rawProduct.sdiProductsPicList.forEach((img: any) => {
+        if (img.url) images.push(img.url);
+      });
+    }
+
+    // Handle single picUrl
+    if (rawProduct.picUrl && images.length === 0) {
+      images.push(rawProduct.picUrl);
+    }
+
+    // Handle productPicUrl
+    if (rawProduct.productPicUrl && images.length === 0) {
+      images.push(rawProduct.productPicUrl);
+    }
+
+    return images.length > 0 ? images : [];
   }
 
   private mapDbProductToProduct(dbProduct: any): Product {
