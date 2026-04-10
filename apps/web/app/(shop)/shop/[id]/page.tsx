@@ -1,20 +1,25 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import { cn } from '@/lib/cn';
 import ProductGrid from '@/components/product/ProductGrid';
+import TranslationToggle from '@/components/product/TranslationToggle';
 import type { Product } from '@/components/product/ProductCard';
+import { DETAILED_PRODUCTS } from '@/lib/mock-data';
 
 // --- Mock Data ---
 const MOCK_SHOP = {
-  id: 'shop-1',
-  name: 'YiwuLED Official Store',
+  id: 'shop-2',
+  nameKo: '금영무역',
+  nameOriginal: '金英贸易有限公司',
   logo: 'https://picsum.photos/seed/shoplogo1/200/200',
   banner: 'https://picsum.photos/seed/shopbanner/1200/400',
   verified: true,
   location: '이우시 푸톈구 4구역 3층',
-  description: '이우 최대 LED 조명 도매 전문 업체입니다. 15년 이상의 경험으로 최고 품질의 LED 제품을 합리적인 가격에 공급합니다.',
+  locationOriginal: '义乌市福田区四区三楼',
+  descriptionKo: '이우 최대 LED 조명 도매 전문 업체입니다. 15년 이상의 경험으로 최고 품질의 LED 제품을 합리적인 가격에 공급합니다.',
+  descriptionOriginal: '义乌最大LED灯饰批发商，15年以上经验，品质保证，价格优惠。',
   stats: {
     products: 1240,
     followers: 3560,
@@ -27,14 +32,24 @@ const MOCK_SHOP = {
 type ShopTab = 'all' | 'popular' | 'new' | 'info';
 
 function generateShopProducts(prefix: string, count: number): Product[] {
+  const productNames = [
+    'LED 무드등 미니 감성조명',
+    'LED 스트립 방수 간접조명',
+    'LED 전구 에너지절약 E27',
+    'LED 센서등 현관 자동점등',
+    'LED 스탠드 학습 밝기조절',
+    'LED 캔들 리모컨 타이머',
+    'LED 네온사인 감성 인테리어',
+    'LED 벽등 무선 충전식',
+  ];
   return Array.from({ length: count }, (_, i) => {
     const priceKRW = Math.floor(Math.random() * 50000) + 3000;
     const badges: Array<Product['badge']> = [null, 'TOP', null, 'SALE', null, 'HOT', null, 'NEW'];
     return {
       id: `${prefix}-${i}`,
-      name: `LED ${['무드등', '스트립', '전구', '센서등', '스탠드', '캔들', '네온사인', '벽등'][i % 8]} ${['미니', '대형', '방수', '충전식', 'RGB', '리모컨', '무선', '타이머'][i % 8]}`,
+      name: productNames[i % productNames.length],
       imageUrl: `https://picsum.photos/seed/${prefix}${i}/400/400`,
-      category: '디지털',
+      category: '조명',
       priceKRW,
       originalPriceKRW: i % 3 === 0 ? Math.floor(priceKRW * 1.2) : undefined,
       priceCNY: Math.floor(priceKRW / 190),
@@ -42,7 +57,7 @@ function generateShopProducts(prefix: string, count: number): Product[] {
       moq: [10, 20, 50, 100][i % 4],
       salesCount: Math.floor(Math.random() * 10000),
       badge: badges[i % badges.length],
-      shopName: MOCK_SHOP.name,
+      shopName: MOCK_SHOP.nameKo,
     };
   });
 }
@@ -86,7 +101,7 @@ export default function ShopDetailPage() {
       <div className="relative h-40 md:h-56 bg-surface-container">
         <img
           src={shop.banner}
-          alt={`${shop.name} 배너`}
+          alt={`${shop.nameKo} 배너`}
           className="w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
@@ -101,12 +116,12 @@ export default function ShopDetailPage() {
         <div className="mx-4 -mt-10 relative z-10 bg-surface-container-lowest rounded-xl border border-outline-variant/20 p-4 shadow-soft">
           <div className="flex items-start gap-3">
             <div className="w-16 h-16 rounded-xl overflow-hidden bg-surface-container border-2 border-surface-container-lowest flex-shrink-0 -mt-8">
-              <img src={shop.logo} alt={shop.name} className="w-full h-full object-cover" />
+              <img src={shop.logo} alt={shop.nameKo} className="w-full h-full object-cover" />
             </div>
             <div className="flex-1 min-w-0 pt-1">
               <div className="flex items-center gap-1.5">
                 <h1 className="text-base font-heading font-bold text-on-surface truncate">
-                  {shop.name}
+                  {shop.nameKo}
                 </h1>
                 {shop.verified && (
                   <span
@@ -117,6 +132,9 @@ export default function ShopDetailPage() {
                   </span>
                 )}
               </div>
+              <p className="text-[10px] text-on-surface-variant/50 mt-0.5">
+                (원문: {shop.nameOriginal})
+              </p>
               <p className="text-xs text-on-surface-variant mt-0.5 flex items-center gap-1">
                 <span className="material-symbols-outlined text-[14px]">location_on</span>
                 {shop.location}
@@ -130,19 +148,19 @@ export default function ShopDetailPage() {
               <p className="text-lg font-heading font-bold text-on-surface">
                 {shop.stats.products.toLocaleString()}
               </p>
-              <p className="text-[10px] text-on-surface-variant">Products</p>
+              <p className="text-[10px] text-on-surface-variant">상품수</p>
             </div>
             <div>
               <p className="text-lg font-heading font-bold text-on-surface">
                 {shop.stats.followers.toLocaleString()}
               </p>
-              <p className="text-[10px] text-on-surface-variant">Followers</p>
+              <p className="text-[10px] text-on-surface-variant">팔로워</p>
             </div>
             <div>
               <p className="text-lg font-heading font-bold text-on-surface">
                 {shop.stats.responseRate}%
               </p>
-              <p className="text-[10px] text-on-surface-variant">Response</p>
+              <p className="text-[10px] text-on-surface-variant">응답률</p>
             </div>
           </div>
 
@@ -217,14 +235,18 @@ export default function ShopDetailPage() {
               {/* About */}
               <div>
                 <h3 className="text-sm font-semibold text-on-surface mb-2">상점 소개</h3>
-                <p className="text-sm text-on-surface-variant leading-relaxed">{shop.description}</p>
+                <TranslationToggle
+                  originalText={shop.descriptionOriginal}
+                  translatedText={shop.descriptionKo}
+                  textClassName="text-sm leading-relaxed text-on-surface-variant"
+                />
               </div>
 
               {/* Details */}
               <div className="space-y-3">
                 <h3 className="text-sm font-semibold text-on-surface mb-2">상점 정보</h3>
                 {[
-                  { icon: 'location_on', label: '위치', value: shop.location },
+                  { icon: 'location_on', label: '위치', value: shop.location, extra: shop.locationOriginal },
                   { icon: 'schedule', label: '응답시간', value: shop.stats.responseTime },
                   { icon: 'history', label: '운영기간', value: `${shop.stats.yearsActive}년` },
                   { icon: 'inventory_2', label: '등록 상품', value: `${shop.stats.products.toLocaleString()}개` },
@@ -233,7 +255,12 @@ export default function ShopDetailPage() {
                   <div key={info.label} className="flex items-center gap-3 py-2 border-b border-outline-variant/10 last:border-0">
                     <span className="material-symbols-outlined text-[20px] text-on-surface-variant">{info.icon}</span>
                     <span className="text-sm text-on-surface-variant w-20">{info.label}</span>
-                    <span className="text-sm font-medium text-on-surface">{info.value}</span>
+                    <div>
+                      <span className="text-sm font-medium text-on-surface">{info.value}</span>
+                      {info.extra && (
+                        <span className="text-[10px] text-on-surface-variant/50 ml-1">({info.extra})</span>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

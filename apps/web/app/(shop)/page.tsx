@@ -6,8 +6,9 @@ import ExchangeRateBanner from '@/components/common/ExchangeRateBanner';
 import ProductCard, { type Product } from '@/components/product/ProductCard';
 import ProductGrid from '@/components/product/ProductGrid';
 import { cn } from '@/lib/cn';
+import { MOCK_PRODUCTS, DETAILED_PRODUCTS, generateMockProduct } from '@/lib/mock-data';
 
-// --- Mock Data ---
+// --- Korean marketing banners ---
 const PROMO_BANNERS = [
   {
     id: '1',
@@ -45,52 +46,53 @@ const CATEGORIES = [
   { icon: 'more_horiz', label: '전체보기', slug: 'all' },
 ];
 
-const POPULAR_TABS = ['전체', '리빙/주방', '디지털', '스포츠'] as const;
+const POPULAR_TABS = ['전체', '조명', '전자', '주방', '뷰티'] as const;
 
-function generateMockProduct(id: number, badge?: Product['badge']): Product {
-  const names = [
-    'LED 무드등 감성 조명 인테리어 램프',
-    '실리콘 주방용품 세트 논슬립 조리도구',
-    'USB-C 멀티 허브 7in1 HDMI 어댑터',
-    '스테인리스 텀블러 500ml 보온보냉',
-    '무선 블루투스 이어폰 노이즈캔슬링',
-    '접이식 캠핑 테이블 경량 알루미늄',
-    '다이캐스팅 냄비 세트 IH 인덕션 호환',
-    '에코백 캔버스 장바구니 대용량',
-    '스마트워치 밴드 실리콘 교체용',
-    '미니 가습기 USB 초음파 무소음',
-    '요가 매트 TPE 6mm 미끄럼방지',
-    'LED 스탠드 조명 터치 밝기조절',
-    '자동차 핸드폰 거치대 에어컨 송풍구',
-    '폴딩 우산 자동 3단 방풍 우산',
-    '실리콘 주방장갑 내열 오븐장갑',
-    '미니 선풍기 USB 탁상용 저소음',
-  ];
-  const categories = ['리빙/주방', '디지털', '스포츠', '패션', '뷰티'];
-  const priceKRW = Math.floor(Math.random() * 50000) + 2000;
-  const priceCNY = Math.floor(priceKRW / 190);
-  return {
-    id: `prod-${id}`,
-    name: names[id % names.length],
-    imageUrl: `https://picsum.photos/seed/yiwu${id}/400/400`,
-    category: categories[id % categories.length],
-    priceKRW,
-    originalPriceKRW: badge === 'SALE' ? Math.floor(priceKRW * 1.3) : undefined,
-    priceCNY,
-    discountPercent: badge === 'SALE' ? 30 : undefined,
-    moq: [10, 20, 50, 100][id % 4],
-    salesCount: Math.floor(Math.random() * 5000),
-    badge: badge || null,
-  };
-}
+// Korean-style badge mapping
+const BADGE_LABELS: Record<string, string> = {
+  TOP: '인기',
+  HOT: '핫딜',
+  NEW: '신상',
+  SALE: '특가',
+};
 
-const NEW_ARRIVALS: Product[] = Array.from({ length: 10 }, (_, i) =>
-  generateMockProduct(i + 100, i < 2 ? 'NEW' : null)
+// Generate new arrivals from detailed products
+const NEW_ARRIVALS: Product[] = DETAILED_PRODUCTS.filter(p => p.badge === 'NEW').map(p => ({
+  id: p.id,
+  name: p.titleKo,
+  imageUrl: p.imageUrl,
+  category: p.category,
+  priceKRW: p.priceKRW,
+  originalPriceKRW: p.originalPriceKRW,
+  priceCNY: p.priceCNY,
+  discountPercent: p.discountPercent,
+  moq: p.moq,
+  salesCount: p.salesCount,
+  badge: 'NEW' as const,
+  shopName: p.shopNameKo,
+  rating: p.rating,
+  reviewCount: p.reviewCount,
+})).concat(
+  DETAILED_PRODUCTS.slice(0, 7).map(p => ({
+    id: `new-${p.id}`,
+    name: p.titleKo,
+    imageUrl: p.imageUrl,
+    category: p.category,
+    priceKRW: p.priceKRW,
+    originalPriceKRW: undefined,
+    priceCNY: p.priceCNY,
+    discountPercent: undefined,
+    moq: p.moq,
+    salesCount: p.salesCount,
+    badge: null as any,
+    shopName: p.shopNameKo,
+    rating: p.rating,
+    reviewCount: p.reviewCount,
+  }))
 );
 
-const POPULAR_PRODUCTS: Product[] = Array.from({ length: 12 }, (_, i) =>
-  generateMockProduct(i + 200, i === 0 ? 'TOP' : i === 3 ? 'HOT' : i === 5 ? 'SALE' : null)
-);
+// Popular products from detailed products
+const POPULAR_PRODUCTS: Product[] = MOCK_PRODUCTS;
 
 // --- Components ---
 
@@ -139,7 +141,6 @@ function PromoBannerCarousel() {
           ))}
         </div>
       </div>
-      {/* Dots */}
       <div className="flex justify-center gap-1.5 mt-3">
         {PROMO_BANNERS.map((_, i) => (
           <button
@@ -224,7 +225,6 @@ function PopularPicksSection() {
           인기 상품
         </h2>
       </div>
-      {/* Tabs */}
       <div className="flex gap-2 mb-4 overflow-x-auto scrollbar-hide">
         {POPULAR_TABS.map((tab) => (
           <button

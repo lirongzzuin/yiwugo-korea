@@ -5,17 +5,33 @@ import { useSearchParams } from 'next/navigation';
 import ProductGrid from '@/components/product/ProductGrid';
 import type { Product } from '@/components/product/ProductCard';
 import { cn } from '@/lib/cn';
+import { DETAILED_PRODUCTS } from '@/lib/mock-data';
 
 // --- Mock Data ---
+const SEARCH_PRODUCT_NAMES = [
+  'LED 무드등 RGB 감성 인테리어',
+  '무선 블루투스 충전기 15W',
+  '실리콘 보호 케이스 에어팟',
+  '스마트 WiFi 소켓 타이머',
+  'LED 센서 모듈 모션감지',
+  '만능 리모컨 에어컨 호환',
+  'LED 디밍 컨트롤러 조광기',
+  '방수 LED 스트립 간접조명',
+];
+
 function generateSearchResults(query: string): Product[] {
   return Array.from({ length: 24 }, (_, i) => {
+    const baseProduct = DETAILED_PRODUCTS[i % DETAILED_PRODUCTS.length];
     const priceKRW = Math.floor(Math.random() * 80000) + 1500;
     const badges: Array<Product['badge']> = [null, 'TOP', 'SALE', 'HOT', null, null, 'NEW', null];
+    const categories = ['주방', '전자', '스포츠', '패션', '조명', '뷰티', '완구', '캠핑'];
     return {
       id: `search-${i}`,
-      name: `${query || '상품'} ${['LED 조명', '무선 충전기', '실리콘 케이스', '스마트 소켓', '센서 모듈', '리모컨', '디밍 컨트롤러', '방수 스트립'][i % 8]} ${i + 1}`,
+      name: query
+        ? `${query} ${SEARCH_PRODUCT_NAMES[i % SEARCH_PRODUCT_NAMES.length]}`
+        : SEARCH_PRODUCT_NAMES[i % SEARCH_PRODUCT_NAMES.length],
       imageUrl: `https://picsum.photos/seed/search${i}/400/400`,
-      category: ['리빙/주방', '디지털', '스포츠', '패션'][i % 4],
+      category: categories[i % categories.length],
       priceKRW,
       originalPriceKRW: i % 3 === 0 ? Math.floor(priceKRW * 1.25) : undefined,
       priceCNY: Math.floor(priceKRW / 190),
@@ -23,6 +39,7 @@ function generateSearchResults(query: string): Product[] {
       moq: [5, 10, 20, 50, 100][i % 5],
       salesCount: Math.floor(Math.random() * 8000),
       badge: badges[i % badges.length],
+      shopName: baseProduct.shopNameKo,
     };
   });
 }

@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation';
 import { cn } from '@/lib/cn';
 import ProductGrid from '@/components/product/ProductGrid';
 import type { Product } from '@/components/product/ProductCard';
+import { DETAILED_PRODUCTS } from '@/lib/mock-data';
 
 // --- Mock Data ---
 const MAIN_CATEGORIES = [
@@ -59,15 +60,27 @@ const POPULAR_KEYWORDS: Record<string, string[]> = {
   digital: ['USB-C 허브', 'LED 스트립', '무선 충전기', '블루투스 스피커', '보조배터리'],
 };
 
+const CATEGORY_PRODUCT_NAMES: Record<string, string[]> = {
+  living: ['실리콘 조리도구 세트', '스테인리스 건조대', '무선 전동 믹서기', '자동 비누 디스펜서', '내열 유리 밀폐용기', '세라믹 칼 세트', '접이식 세탁 바구니', '다용도 수납 선반'],
+  fashion: ['레이어드 체인 목걸이', '캔버스 크로스백', '가죽 벨트 남녀공용', '선글라스 UV400', '실크 스카프 봄용', '미니 클러치 파우치', '스터드 귀걸이 세트', '니트 비니 모자'],
+  digital: ['USB-C 멀티허브 7in1', 'LED 무드등 RGB', '무선 블루투스 이어폰', '보조배터리 10000mAh', 'USB 선풍기 탁상용', '노트북 거치대 접이식', '스마트워치 밴드', '무선 충전 패드'],
+  beauty: ['메이크업 브러쉬 15종', '접이식 거울 LED', '네일아트 스티커 세트', '실리콘 세안 브러쉬', '뷰티 블렌더 세트', '속눈썹 뷰러 전문가용', '마사지 롤러 옥석', '화장품 정리함 아크릴'],
+  stationery: ['감성 다이어리 A5', '마스킹 테이프 30종', '컬러 젤펜 세트 12색', '미니 스탬프 세트', '데스크 오거나이저', '메모 패드 귀여운', '북마크 금속 클립', '형광펜 파스텔 6색'],
+  sports: ['요가 매트 TPE 6mm', '접이식 캠핑 체어', '저항 밴드 5단계', '점프 로프 디지털', '수영 고글 방김', '런닝 암밴드 스마트폰', '복근 운동 롤러', '운동 물병 1L'],
+  default: ['인기 도매 상품', '베스트셀러 상품', '신상품 입고', '한정 특가 상품', '추천 소싱 상품', '대량구매 할인', '샘플 구매 가능', '즉시 출고 상품'],
+};
+
 function generateCategoryProducts(slug: string): Product[] {
+  const names = CATEGORY_PRODUCT_NAMES[slug] || CATEGORY_PRODUCT_NAMES['default'];
   return Array.from({ length: 16 }, (_, i) => {
+    const baseProduct = DETAILED_PRODUCTS[i % DETAILED_PRODUCTS.length];
     const priceKRW = Math.floor(Math.random() * 60000) + 2000;
     const badges: Array<Product['badge']> = [null, 'TOP', null, 'SALE', null, 'HOT', null, null];
     return {
       id: `cat-${slug}-${i}`,
-      name: `${MAIN_CATEGORIES.find((c) => c.slug === slug)?.label || '상품'} 인기제품 ${i + 1}`,
+      name: names[i % names.length],
       imageUrl: `https://picsum.photos/seed/cat${slug}${i}/400/400`,
-      category: slug,
+      category: MAIN_CATEGORIES.find((c) => c.slug === slug)?.label || slug,
       priceKRW,
       originalPriceKRW: i % 4 === 0 ? Math.floor(priceKRW * 1.2) : undefined,
       priceCNY: Math.floor(priceKRW / 190),
@@ -75,6 +88,7 @@ function generateCategoryProducts(slug: string): Product[] {
       moq: [10, 20, 50, 100][i % 4],
       salesCount: Math.floor(Math.random() * 5000),
       badge: badges[i % badges.length],
+      shopName: baseProduct.shopNameKo,
     };
   });
 }

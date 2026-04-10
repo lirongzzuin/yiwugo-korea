@@ -7,125 +7,13 @@ import { cn } from '@/lib/cn';
 import ProductPrice from '@/components/product/ProductPrice';
 import CostBreakdown from '@/components/product/CostBreakdown';
 import ImportDisclaimer from '@/components/product/ImportDisclaimer';
+import TranslationToggle from '@/components/product/TranslationToggle';
+import TranslationBadge from '@/components/product/TranslationBadge';
+import SizeGuide from '@/components/product/SizeGuide';
 import { useCartStore } from '@/stores/cart-store';
 import { useWishlistStore } from '@/stores/wishlist-store';
 import { useUIStore } from '@/stores/ui-store';
-
-// --- Mock Data ---
-const MOCK_PRODUCTS = [
-  {
-    id: 'prod-1',
-    name: 'LED 무드등 감성 조명 RGB 인테리어 수면등 침실 취침등 리모컨 포함',
-    images: Array.from({ length: 8 }, (_, i) => `https://picsum.photos/seed/detail${i}/600/600`),
-    category: '리빙/주방',
-    priceKRW: 12500,
-    originalPriceKRW: 18000,
-    priceCNY: 65.79,
-    discountPercent: 31,
-    moq: 20,
-    rating: 4.6,
-    reviewCount: 328,
-    salesCount: 5840,
-    colors: ['화이트', '블랙', '우드', '핑크'],
-    sizes: ['S (15cm)', 'M (20cm)', 'L (25cm)'],
-    weightKg: 0.25,
-    deliveryDays: '7~12',
-    shop: {
-      id: 'shop-1',
-      name: 'YiwuLED Official Store',
-      logo: 'https://picsum.photos/seed/shop1/100/100',
-      verified: true,
-      location: '이우시 푸톈구',
-      responseRate: 98,
-      products: 1240,
-      followers: 3560,
-    },
-    description: `
-      <p>고품질 LED 무드등으로 감성 인테리어를 완성하세요.</p>
-      <ul>
-        <li>RGB 16색 변환</li>
-        <li>리모컨 제어 + 터치 제어</li>
-        <li>USB 충전식 (2시간 충전, 8시간 사용)</li>
-        <li>IP65 방수 등급</li>
-        <li>무게: 250g</li>
-      </ul>
-    `,
-  },
-  {
-    id: 'prod-2',
-    name: '실리콘 주방용품 세트 12종 논슬립 내열 조리도구',
-    images: Array.from({ length: 6 }, (_, i) => `https://picsum.photos/seed/kitchen${i}/600/600`),
-    category: '리빙/주방',
-    priceKRW: 8900,
-    originalPriceKRW: 12000,
-    priceCNY: 46.84,
-    discountPercent: 26,
-    moq: 10,
-    rating: 4.4,
-    reviewCount: 156,
-    salesCount: 3200,
-    colors: ['그린', '핑크', '그레이'],
-    sizes: ['12종 세트', '6종 세트'],
-    weightKg: 1.2,
-    deliveryDays: '7~10',
-    shop: {
-      id: 'shop-2',
-      name: '이우 키친웨어',
-      logo: 'https://picsum.photos/seed/shop2/100/100',
-      verified: true,
-      location: '이우시 궈제상마오청',
-      responseRate: 95,
-      products: 860,
-      followers: 2100,
-    },
-    description: `
-      <p>내열 실리콘 소재로 안전한 주방용품 세트입니다.</p>
-      <ul>
-        <li>내열 온도: 230도</li>
-        <li>FDA 인증 식품 등급 실리콘</li>
-        <li>논슬립 손잡이</li>
-        <li>식기세척기 사용 가능</li>
-      </ul>
-    `,
-  },
-  {
-    id: 'prod-3',
-    name: 'USB-C 멀티 허브 7in1 4K HDMI 어댑터 맥북 프로 호환',
-    images: Array.from({ length: 6 }, (_, i) => `https://picsum.photos/seed/hub${i}/600/600`),
-    category: '디지털',
-    priceKRW: 18900,
-    originalPriceKRW: 25000,
-    priceCNY: 99.47,
-    discountPercent: 24,
-    moq: 50,
-    rating: 4.7,
-    reviewCount: 412,
-    salesCount: 8920,
-    colors: ['실버', '스페이스그레이'],
-    sizes: ['7포트', '5포트'],
-    weightKg: 0.15,
-    deliveryDays: '5~8',
-    shop: {
-      id: 'shop-3',
-      name: '광저우 디지털 마트',
-      logo: 'https://picsum.photos/seed/shop3/100/100',
-      verified: true,
-      location: '광저우시 텐허구',
-      responseRate: 99,
-      products: 2340,
-      followers: 5800,
-    },
-    description: `
-      <p>7-in-1 USB-C 멀티 허브로 생산성을 높이세요.</p>
-      <ul>
-        <li>4K HDMI 출력</li>
-        <li>USB 3.0 x 3</li>
-        <li>SD/TF 카드 리더</li>
-        <li>PD 100W 충전</li>
-      </ul>
-    `,
-  },
-];
+import { DETAILED_PRODUCTS } from '@/lib/mock-data';
 
 const MOCK_REVIEWS = [
   { id: '1', user: '김**', rating: 5, date: '2026-03-28', content: '품질 좋고 색상이 예뻐요. 대량 주문에도 일관된 품질입니다.' },
@@ -141,14 +29,19 @@ export default function ProductDetailPage() {
   const productId = params.id as string;
 
   const product = useMemo(() => {
-    return MOCK_PRODUCTS.find(p => p.id === productId) || MOCK_PRODUCTS[0];
+    return DETAILED_PRODUCTS.find(p => p.id === productId) || DETAILED_PRODUCTS[0];
   }, [productId]);
 
   const [currentImage, setCurrentImage] = useState(0);
   const [selectedColor, setSelectedColor] = useState(0);
   const [selectedSize, setSelectedSize] = useState(0);
-  const [quantity, setQuantity] = useState(product.moq);
+  const [quantity, setQuantity] = useState(product.moq || 10);
   const [activeTab, setActiveTab] = useState<TabKey>('detail');
+  const [showSizeGuide, setShowSizeGuide] = useState(false);
+  const [showOriginalTitle, setShowOriginalTitle] = useState(false);
+
+  const colorOptions = product.optionsKo?.[0];
+  const sizeOptions = product.optionsKo?.[1];
 
   const addToCart = useCartStore((s) => s.addItem);
   const toggleWishlist = useWishlistStore((s) => s.toggleItem);
@@ -156,45 +49,36 @@ export default function ProductDetailPage() {
   const showToast = useUIStore((s) => s.showToast);
 
   const handleAddToCart = () => {
+    const colorLabel = colorOptions?.valuesKo[selectedColor] || '';
+    const sizeLabel = sizeOptions?.valuesKo[selectedSize] || '';
     addToCart({
       productId: product.id,
-      productName: product.name,
+      productName: product.titleKo,
       shopId: product.shop.id,
       shopName: product.shop.name,
       imageUrl: product.images[0],
       priceKrw: product.priceKRW,
-      priceCny: product.priceCNY,
+      priceCny: product.priceCNY || 0,
       quantity,
-      options: `${product.colors[selectedColor]} / ${product.sizes[selectedSize]}`,
-      minOrderQty: product.moq,
+      options: `${colorLabel} / ${sizeLabel}`,
+      minOrderQty: product.moq || 10,
     });
     showToast('장바구니에 추가되었습니다', 'success');
   };
 
   const handleBuyNow = () => {
-    addToCart({
-      productId: product.id,
-      productName: product.name,
-      shopId: product.shop.id,
-      shopName: product.shop.name,
-      imageUrl: product.images[0],
-      priceKrw: product.priceKRW,
-      priceCny: product.priceCNY,
-      quantity,
-      options: `${product.colors[selectedColor]} / ${product.sizes[selectedSize]}`,
-      minOrderQty: product.moq,
-    });
+    handleAddToCart();
     router.push('/checkout');
   };
 
   const handleToggleWishlist = () => {
     toggleWishlist({
       productId: product.id,
-      productName: product.name,
+      productName: product.titleKo,
       imageUrl: product.images[0],
       priceKrw: product.priceKRW,
-      priceCny: product.priceCNY,
-      category: product.category,
+      priceCny: product.priceCNY || 0,
+      category: product.category || '',
       addedAt: new Date().toISOString(),
     });
     showToast(
@@ -205,7 +89,7 @@ export default function ProductDetailPage() {
 
   const tabs: { key: TabKey; label: string }[] = [
     { key: 'detail', label: '상세정보' },
-    { key: 'reviews', label: `리뷰 (${product.reviewCount})` },
+    { key: 'reviews', label: `리뷰 (${product.reviewCount || 0})` },
     { key: 'inquiry', label: '문의하기' },
   ];
 
@@ -216,15 +100,13 @@ export default function ProductDetailPage() {
         <div className="aspect-square overflow-hidden">
           <img
             src={product.images[currentImage]}
-            alt={product.name}
+            alt={product.titleKo}
             className="w-full h-full object-cover"
           />
         </div>
-        {/* Counter */}
         <div className="absolute bottom-3 right-3 bg-black/50 text-white text-xs px-2.5 py-1 rounded-full backdrop-blur-sm">
           {currentImage + 1}/{product.images.length}
         </div>
-        {/* Thumbnail strip */}
         <div className="flex gap-1 p-2 overflow-x-auto scrollbar-hide">
           {product.images.map((img, i) => (
             <button
@@ -242,7 +124,6 @@ export default function ProductDetailPage() {
       </div>
 
       <div className="max-w-3xl mx-auto">
-        {/* Import disclaimer banner */}
         <ImportDisclaimer />
 
         {/* Price Section */}
@@ -254,9 +135,25 @@ export default function ProductDetailPage() {
             discountPercent={product.discountPercent}
             size="lg"
           />
-          <h1 className="text-base font-medium text-on-surface mt-3 leading-snug">
-            {product.name}
-          </h1>
+
+          {/* Korean title as primary */}
+          <div className="mt-3">
+            <div className="flex items-start gap-2">
+              <h1 className="text-base font-medium text-on-surface leading-snug flex-1">
+                {product.titleKo}
+              </h1>
+              <TranslationBadge
+                className="flex-shrink-0 mt-0.5"
+                onToggleOriginal={() => setShowOriginalTitle(!showOriginalTitle)}
+              />
+            </div>
+            {showOriginalTitle && (
+              <p className="text-xs text-on-surface-variant/60 mt-1.5 leading-snug">
+                {product.titleOriginal}
+              </p>
+            )}
+          </div>
+
           <div className="flex items-center gap-3 mt-2 text-xs text-on-surface-variant">
             <div className="flex items-center gap-0.5">
               <span className="material-symbols-outlined text-secondary-container text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>
@@ -266,15 +163,15 @@ export default function ProductDetailPage() {
               <span>({product.reviewCount})</span>
             </div>
             <span>|</span>
-            <span>판매 {product.salesCount.toLocaleString()}개</span>
+            <span>누적 {(product.salesCount || 0).toLocaleString()}+ 판매</span>
             <span>|</span>
             <span className="bg-surface-container px-1.5 py-0.5 rounded text-[10px] font-medium">
-              MOQ {product.moq}개
+              MOQ {product.moq}{product.unitKo}
             </span>
           </div>
         </div>
 
-        {/* Shipping & Logistics Card */}
+        {/* Shipping & Logistics */}
         <div className="mx-4 mt-3 p-4 bg-surface-container-lowest rounded-xl border border-outline-variant/20">
           <h3 className="text-sm font-semibold text-on-surface mb-3 flex items-center gap-1.5">
             <span className="material-symbols-outlined text-[18px] text-tertiary">local_shipping</span>
@@ -301,12 +198,12 @@ export default function ProductDetailPage() {
 
         {/* Cost Breakdown */}
         <CostBreakdown
-          priceCny={product.priceCNY}
+          priceCny={product.priceCNY || 0}
           quantity={quantity}
           weightKg={product.weightKg}
         />
 
-        {/* Store Info Card */}
+        {/* Shop Info Card */}
         <div className="mx-4 mt-3 p-4 bg-surface-container-lowest rounded-xl border border-outline-variant/20">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-full overflow-hidden bg-surface-container flex-shrink-0">
@@ -321,7 +218,12 @@ export default function ProductDetailPage() {
                   </span>
                 )}
               </div>
-              <p className="text-[10px] text-on-surface-variant mt-0.5">{product.shop.location}</p>
+              <p className="text-[10px] text-on-surface-variant mt-0.5">
+                {product.shop.location}
+                <span className="text-on-surface-variant/40 ml-1">
+                  ({product.shop.locationOriginal})
+                </span>
+              </p>
             </div>
             <Link
               href={`/shop/${product.shop.id}`}
@@ -348,61 +250,75 @@ export default function ProductDetailPage() {
 
         {/* Options Section */}
         <div className="px-4 mt-4 space-y-4">
-          {/* Color */}
-          <div>
-            <h3 className="text-sm font-semibold text-on-surface mb-2">
-              색상 <span className="text-on-surface-variant font-normal">: {product.colors[selectedColor]}</span>
-            </h3>
-            <div className="flex gap-2">
-              {product.colors.map((color, i) => (
-                <button
-                  key={color}
-                  onClick={() => setSelectedColor(i)}
-                  className={cn(
-                    'px-4 py-2 rounded-lg text-sm font-medium border transition-colors',
-                    i === selectedColor
-                      ? 'border-primary bg-primary/5 text-primary'
-                      : 'border-outline-variant/40 text-on-surface-variant hover:border-primary/50'
-                  )}
-                >
-                  {color}
-                </button>
-              ))}
+          {/* Color - Korean labels */}
+          {colorOptions && (
+            <div>
+              <h3 className="text-sm font-semibold text-on-surface mb-2">
+                {colorOptions.labelKo}{' '}
+                <span className="text-on-surface-variant font-normal">: {colorOptions.valuesKo[selectedColor]}</span>
+              </h3>
+              <div className="flex gap-2">
+                {colorOptions.valuesKo.map((color, i) => (
+                  <button
+                    key={color}
+                    onClick={() => setSelectedColor(i)}
+                    className={cn(
+                      'px-4 py-2 rounded-lg text-sm font-medium border transition-colors',
+                      i === selectedColor
+                        ? 'border-primary bg-primary/5 text-primary'
+                        : 'border-outline-variant/40 text-on-surface-variant hover:border-primary/50'
+                    )}
+                  >
+                    {color}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Size */}
-          <div>
-            <h3 className="text-sm font-semibold text-on-surface mb-2">사이즈</h3>
-            <div className="grid grid-cols-3 gap-2">
-              {product.sizes.map((size, i) => (
+          {/* Size - Korean labels with size guide */}
+          {sizeOptions && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-semibold text-on-surface">{sizeOptions.labelKo}</h3>
                 <button
-                  key={size}
-                  onClick={() => setSelectedSize(i)}
-                  className={cn(
-                    'py-2.5 rounded-lg text-sm font-medium border text-center transition-colors',
-                    i === selectedSize
-                      ? 'border-primary bg-primary/5 text-primary'
-                      : 'border-outline-variant/40 text-on-surface-variant hover:border-primary/50'
-                  )}
+                  onClick={() => setShowSizeGuide(true)}
+                  className="text-[11px] text-primary font-medium flex items-center gap-0.5 hover:underline"
                 >
-                  {size}
+                  <span className="material-symbols-outlined text-[14px]">straighten</span>
+                  사이즈 가이드
                 </button>
-              ))}
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {sizeOptions.valuesKo.map((size, i) => (
+                  <button
+                    key={size}
+                    onClick={() => setSelectedSize(i)}
+                    className={cn(
+                      'py-2.5 rounded-lg text-sm font-medium border text-center transition-colors',
+                      i === selectedSize
+                        ? 'border-primary bg-primary/5 text-primary'
+                        : 'border-outline-variant/40 text-on-surface-variant hover:border-primary/50'
+                    )}
+                  >
+                    {size}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Quantity */}
           <div>
             <h3 className="text-sm font-semibold text-on-surface mb-2">
               수량{' '}
               <span className="text-[10px] font-normal text-on-surface-variant bg-surface-container px-1.5 py-0.5 rounded ml-1">
-                MOQ {product.moq}개
+                MOQ {product.moq}{product.unitKo}
               </span>
             </h3>
             <div className="flex items-center gap-3">
               <button
-                onClick={() => setQuantity(Math.max(product.moq, quantity - 10))}
+                onClick={() => setQuantity(Math.max(product.moq || 1, quantity - 10))}
                 className="w-9 h-9 rounded-lg border border-outline-variant/40 flex items-center justify-center hover:border-primary transition-colors"
               >
                 <span className="material-symbols-outlined text-[18px]">remove</span>
@@ -411,8 +327,8 @@ export default function ProductDetailPage() {
                 type="number"
                 value={quantity}
                 onChange={(e) => {
-                  const val = parseInt(e.target.value) || product.moq;
-                  setQuantity(Math.max(product.moq, val));
+                  const val = parseInt(e.target.value) || (product.moq || 1);
+                  setQuantity(Math.max(product.moq || 1, val));
                 }}
                 className="w-20 h-9 text-center border border-outline-variant/40 rounded-lg text-sm font-medium bg-transparent focus:border-primary focus:outline-none"
               />
@@ -428,6 +344,21 @@ export default function ProductDetailPage() {
             </div>
           </div>
         </div>
+
+        {/* Specs Table - Korean */}
+        {product.specsKo && product.specsKo.length > 0 && (
+          <div className="mx-4 mt-4 p-4 bg-surface-container-lowest rounded-xl border border-outline-variant/20">
+            <h3 className="text-sm font-semibold text-on-surface mb-3">상품 사양</h3>
+            <div className="space-y-2">
+              {product.specsKo.map((spec, i) => (
+                <div key={i} className="flex items-center py-1.5 border-b border-outline-variant/10 last:border-0">
+                  <span className="text-xs text-on-surface-variant w-24 flex-shrink-0">{spec.keyKo}</span>
+                  <span className="text-xs font-medium text-on-surface">{spec.valueKo}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="mt-6 border-t border-outline-variant/20">
@@ -450,8 +381,13 @@ export default function ProductDetailPage() {
 
           <div className="px-4 py-5">
             {activeTab === 'detail' && (
-              <div className="prose prose-sm max-w-none text-on-surface">
-                <div dangerouslySetInnerHTML={{ __html: product.description }} />
+              <div className="space-y-4">
+                {/* Korean description with toggle to original */}
+                <TranslationToggle
+                  originalText={product.descOriginal}
+                  translatedText={product.descKo}
+                  textClassName="text-sm leading-relaxed"
+                />
                 <div className="mt-4 space-y-2">
                   {product.images.slice(2, 6).map((img, i) => (
                     <img
@@ -468,7 +404,6 @@ export default function ProductDetailPage() {
 
             {activeTab === 'reviews' && (
               <div className="space-y-4">
-                {/* Rating summary */}
                 <div className="flex items-center gap-4 p-4 bg-surface-container-low rounded-xl">
                   <div className="text-center">
                     <p className="text-3xl font-heading font-black text-on-surface">{product.rating}</p>
@@ -478,7 +413,7 @@ export default function ProductDetailPage() {
                           key={star}
                           className={cn(
                             'material-symbols-outlined text-[16px]',
-                            star <= Math.round(product.rating)
+                            star <= Math.round(product.rating || 0)
                               ? 'text-secondary-container'
                               : 'text-stone-300'
                           )}
@@ -492,7 +427,6 @@ export default function ProductDetailPage() {
                   </div>
                 </div>
 
-                {/* Reviews list */}
                 {MOCK_REVIEWS.map((review) => (
                   <div key={review.id} className="pb-4 border-b border-outline-variant/20 last:border-0">
                     <div className="flex items-center justify-between mb-2">
@@ -537,6 +471,13 @@ export default function ProductDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Size Guide Modal */}
+      <SizeGuide
+        type={product.category === '신발' ? 'shoes' : 'clothing'}
+        isOpen={showSizeGuide}
+        onClose={() => setShowSizeGuide(false)}
+      />
 
       {/* Bottom Action Bar */}
       <div className="fixed bottom-0 left-0 right-0 bg-surface-container-lowest border-t border-outline-variant/20 px-4 py-3 z-40">

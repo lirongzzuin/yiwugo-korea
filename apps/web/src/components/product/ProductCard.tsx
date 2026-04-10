@@ -34,6 +34,13 @@ const badgeStyles: Record<string, string> = {
   NEW: 'bg-tertiary text-white',
 };
 
+const badgeLabels: Record<string, string> = {
+  TOP: '인기',
+  SALE: '특가',
+  HOT: '핫딜',
+  NEW: '신상',
+};
+
 export default function ProductCard({ product, className }: ProductCardProps) {
   const [isFav, setIsFav] = useState(false);
 
@@ -61,7 +68,7 @@ export default function ProductCard({ product, className }: ProductCardProps) {
               badgeStyles[product.badge]
             )}
           >
-            {product.badge}
+            {badgeLabels[product.badge] || product.badge}
           </span>
         )}
         {/* Favorite */}
@@ -109,7 +116,7 @@ export default function ProductCard({ product, className }: ProductCardProps) {
             </span>
           )}
           {product.salesCount !== undefined && product.salesCount > 0 && (
-            <span>{product.salesCount.toLocaleString()}개 판매</span>
+            <span>누적 {product.salesCount.toLocaleString()}+ 판매</span>
           )}
         </div>
       </div>
