@@ -27,10 +27,11 @@ export interface ApiError {
 }
 
 /**
- * Demo mode: when NEXT_PUBLIC_API_URL is empty, all API calls
- * are intercepted and return mock data.
+ * API client: always uses /api/ routes (Next.js API Routes on Vercel)
+ * When NEXT_PUBLIC_API_URL is set, rewrites proxy to external backend.
+ * Otherwise, internal API routes handle requests directly.
  */
-const IS_DEMO_MODE = !process.env.NEXT_PUBLIC_API_URL;
+const IS_DEMO_MODE = false; // Disabled — real API routes always available
 
 const apiClient = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || '/api',

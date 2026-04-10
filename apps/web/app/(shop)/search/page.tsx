@@ -1,48 +1,10 @@
 'use client';
 
-import { useState, useMemo, Suspense } from 'react';
+import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import ProductGrid from '@/components/product/ProductGrid';
 import type { Product } from '@/components/product/ProductCard';
 import { cn } from '@/lib/cn';
-import { DETAILED_PRODUCTS } from '@/lib/mock-data';
-
-// --- Mock Data ---
-const SEARCH_PRODUCT_NAMES = [
-  'LED 무드등 RGB 감성 인테리어',
-  '무선 블루투스 충전기 15W',
-  '실리콘 보호 케이스 에어팟',
-  '스마트 WiFi 소켓 타이머',
-  'LED 센서 모듈 모션감지',
-  '만능 리모컨 에어컨 호환',
-  'LED 디밍 컨트롤러 조광기',
-  '방수 LED 스트립 간접조명',
-];
-
-function generateSearchResults(query: string): Product[] {
-  return Array.from({ length: 24 }, (_, i) => {
-    const baseProduct = DETAILED_PRODUCTS[i % DETAILED_PRODUCTS.length];
-    const priceKRW = Math.floor(Math.random() * 80000) + 1500;
-    const badges: Array<Product['badge']> = [null, 'TOP', 'SALE', 'HOT', null, null, 'NEW', null];
-    const categories = ['주방', '전자', '스포츠', '패션', '조명', '뷰티', '완구', '캠핑'];
-    return {
-      id: `search-${i}`,
-      name: query
-        ? `${query} ${SEARCH_PRODUCT_NAMES[i % SEARCH_PRODUCT_NAMES.length]}`
-        : SEARCH_PRODUCT_NAMES[i % SEARCH_PRODUCT_NAMES.length],
-      imageUrl: `https://picsum.photos/seed/search${i}/400/400`,
-      category: categories[i % categories.length],
-      priceKRW,
-      originalPriceKRW: i % 3 === 0 ? Math.floor(priceKRW * 1.25) : undefined,
-      priceCNY: Math.floor(priceKRW / 190),
-      discountPercent: i % 3 === 0 ? 20 : undefined,
-      moq: [5, 10, 20, 50, 100][i % 5],
-      salesCount: Math.floor(Math.random() * 8000),
-      badge: badges[i % badges.length],
-      shopName: baseProduct.shopNameKo,
-    };
-  });
-}
 
 type SortKey = 'relevance' | 'price_asc' | 'price_desc' | 'sales' | 'newest';
 type PriceRange = 'all' | 'under5k' | '5k-20k' | '20k-50k' | 'over50k';
@@ -72,6 +34,14 @@ const MOQ_RANGES: { key: MoqRange; label: string }[] = [
   { key: 'over100', label: '100개 이상' },
 ];
 
+const SORT_MAP: Record<SortKey, string> = {
+  relevance: '',
+  price_asc: 'priceAsc',
+  price_desc: 'priceDesc',
+  sales: 'popular',
+  newest: 'newest',
+};
+
 export default function SearchPage() {
   return (
     <Suspense fallback={<div className="max-w-7xl mx-auto px-4 lg:px-8 py-4"><div className="animate-pulse h-96 bg-surface-container rounded-xl" /></div>}>
@@ -83,6 +53,7 @@ export default function SearchPage() {
 function SearchPageContent() {
   const searchParams = useSearchParams();
   const query = searchParams.get('q') || '';
+  const categoryId = searchParams.get('categoryId') || '';
 
   const [sort, setSort] = useState<SortKey>('relevance');
   const [priceRange, setPriceRange] = useState<PriceRange>('all');
@@ -91,15 +62,44 @@ function SearchPageContent() {
   const [freeShipping, setFreeShipping] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [displayCount, setDisplayCount] = useState(12);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [loading, setLoading] = useState(true);
 
-  const allProducts = useMemo(() => generateSearchResults(query), [query]);
+  const fetchProducts = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (query) params.set('q', query);
+      if (categoryId) params.set('categoryId', categoryId);
+      params.set('page', '1');
+      params.set('pageSize', '48');
+      if (SORT_MAP[sort]) params.set('sortBy', SORT_MAP[sort]);
+
+      const res = await fetch(`/api/products/search?${params}`);
+      const data = await res.json();
+
+      if (data?.data && Array.isArray(data.data)) {
+        setProducts(data.data);
+        setTotalCount(data.total || data.data.length);
+      }
+    } catch {
+      // silent
+    } finally {
+      setLoading(false);
+    }
+  }, [query, categoryId, sort]);
+
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
 
   const filteredProducts = useMemo(() => {
-    let products = [...allProducts];
+    let result = [...products];
 
     // Price filter
     if (priceRange !== 'all') {
-      products = products.filter((p) => {
+      result = result.filter((p) => {
         switch (priceRange) {
           case 'under5k': return p.priceKRW < 5000;
           case '5k-20k': return p.priceKRW >= 5000 && p.priceKRW < 20000;
@@ -112,7 +112,7 @@ function SearchPageContent() {
 
     // MOQ filter
     if (moqRange !== 'all') {
-      products = products.filter((p) => {
+      result = result.filter((p) => {
         const moq = p.moq || 0;
         switch (moqRange) {
           case 'under10': return moq <= 10;
@@ -124,23 +124,13 @@ function SearchPageContent() {
       });
     }
 
-    // Sort
-    switch (sort) {
-      case 'price_asc':
-        products.sort((a, b) => a.priceKRW - b.priceKRW);
-        break;
-      case 'price_desc':
-        products.sort((a, b) => b.priceKRW - a.priceKRW);
-        break;
-      case 'sales':
-        products.sort((a, b) => (b.salesCount || 0) - (a.salesCount || 0));
-        break;
-      default:
-        break;
-    }
+    // Client-side sort (price sort backup)
+    if (sort === 'price_asc') result.sort((a, b) => a.priceKRW - b.priceKRW);
+    if (sort === 'price_desc') result.sort((a, b) => b.priceKRW - a.priceKRW);
+    if (sort === 'sales') result.sort((a, b) => (b.salesCount || 0) - (a.salesCount || 0));
 
-    return products;
-  }, [allProducts, priceRange, moqRange, sort]);
+    return result;
+  }, [products, priceRange, moqRange, sort]);
 
   const displayedProducts = filteredProducts.slice(0, displayCount);
   const hasMore = displayCount < filteredProducts.length;
@@ -152,7 +142,7 @@ function SearchPageContent() {
         <h1 className="text-base font-heading font-bold text-on-surface">
           {query ? (
             <>
-              <span className="text-primary">{query}</span>{' '}
+              <span className="text-primary">&lsquo;{query}&rsquo;</span>{' '}
               <span className="text-on-surface-variant font-normal">
                 {filteredProducts.length.toLocaleString()}개
               </span>
@@ -215,7 +205,6 @@ function SearchPageContent() {
       {/* Expanded filter panel */}
       {showFilters && (
         <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/30 p-4 mb-4 animate-slide-down space-y-4 md:hidden">
-          {/* Price range */}
           <div>
             <h3 className="text-xs font-semibold text-on-surface mb-2">가격대</h3>
             <div className="flex flex-wrap gap-2">
@@ -235,7 +224,6 @@ function SearchPageContent() {
               ))}
             </div>
           </div>
-          {/* MOQ */}
           <div>
             <h3 className="text-xs font-semibold text-on-surface mb-2">최소 주문수량</h3>
             <div className="flex flex-wrap gap-2">
@@ -304,10 +292,23 @@ function SearchPageContent() {
 
         {/* Results */}
         <div className="flex-1">
-          <ProductGrid products={displayedProducts} columns={2} />
+          {loading ? (
+            <div className="grid grid-cols-2 gap-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="h-[280px] bg-surface-container rounded-xl animate-pulse" />
+              ))}
+            </div>
+          ) : displayedProducts.length === 0 ? (
+            <div className="text-center py-20">
+              <span className="material-symbols-outlined text-[48px] text-on-surface-variant/40">search_off</span>
+              <p className="text-on-surface-variant mt-4">검색 결과가 없습니다.</p>
+            </div>
+          ) : (
+            <ProductGrid products={displayedProducts} columns={2} />
+          )}
 
           {/* Load more */}
-          {hasMore && (
+          {hasMore && !loading && (
             <div className="flex justify-center mt-6">
               <button
                 onClick={() => setDisplayCount((c) => c + 12)}

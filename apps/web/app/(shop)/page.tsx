@@ -6,7 +6,6 @@ import ExchangeRateBanner from '@/components/common/ExchangeRateBanner';
 import ProductCard, { type Product } from '@/components/product/ProductCard';
 import ProductGrid from '@/components/product/ProductGrid';
 import { cn } from '@/lib/cn';
-import { MOCK_PRODUCTS, DETAILED_PRODUCTS, generateMockProduct } from '@/lib/mock-data';
 
 // --- Korean marketing banners ---
 const PROMO_BANNERS = [
@@ -47,52 +46,6 @@ const CATEGORIES = [
 ];
 
 const POPULAR_TABS = ['전체', '조명', '전자', '주방', '뷰티'] as const;
-
-// Korean-style badge mapping
-const BADGE_LABELS: Record<string, string> = {
-  TOP: '인기',
-  HOT: '핫딜',
-  NEW: '신상',
-  SALE: '특가',
-};
-
-// Generate new arrivals from detailed products
-const NEW_ARRIVALS: Product[] = DETAILED_PRODUCTS.filter(p => p.badge === 'NEW').map(p => ({
-  id: p.id,
-  name: p.titleKo,
-  imageUrl: p.imageUrl,
-  category: p.category,
-  priceKRW: p.priceKRW,
-  originalPriceKRW: p.originalPriceKRW,
-  priceCNY: p.priceCNY,
-  discountPercent: p.discountPercent,
-  moq: p.moq,
-  salesCount: p.salesCount,
-  badge: 'NEW' as const,
-  shopName: p.shopNameKo,
-  rating: p.rating,
-  reviewCount: p.reviewCount,
-})).concat(
-  DETAILED_PRODUCTS.slice(0, 7).map(p => ({
-    id: `new-${p.id}`,
-    name: p.titleKo,
-    imageUrl: p.imageUrl,
-    category: p.category,
-    priceKRW: p.priceKRW,
-    originalPriceKRW: undefined,
-    priceCNY: p.priceCNY,
-    discountPercent: undefined,
-    moq: p.moq,
-    salesCount: p.salesCount,
-    badge: null as any,
-    shopName: p.shopNameKo,
-    rating: p.rating,
-    reviewCount: p.reviewCount,
-  }))
-);
-
-// Popular products from detailed products
-const POPULAR_PRODUCTS: Product[] = MOCK_PRODUCTS;
 
 // --- Components ---
 
@@ -165,7 +118,7 @@ function CategoryGrid() {
       {CATEGORIES.map((cat) => (
         <Link
           key={cat.slug}
-          href={`/category/${cat.slug}`}
+          href={cat.slug === 'all' ? '/category' : `/category/${cat.slug}`}
           className="flex flex-col items-center gap-1.5 p-2 md:p-3 rounded-xl hover:bg-surface-container transition-colors"
         >
           <div className="w-11 h-11 md:w-12 md:h-12 rounded-full bg-primary/5 flex items-center justify-center">
@@ -183,6 +136,36 @@ function CategoryGrid() {
 }
 
 function NewArrivalsSection() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/products/featured')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.data && Array.isArray(data.data)) {
+          setProducts(data.data);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <section>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-heading font-bold text-on-surface">신상품</h2>
+        </div>
+        <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="flex-shrink-0 w-[150px] md:w-[180px] h-[240px] bg-surface-container rounded-xl animate-pulse" />
+          ))}
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section>
       <div className="flex items-center justify-between mb-4">
@@ -200,7 +183,7 @@ function NewArrivalsSection() {
         </Link>
       </div>
       <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2 -mx-4 px-4">
-        {NEW_ARRIVALS.map((product) => (
+        {products.map((product) => (
           <div key={product.id} className="flex-shrink-0 w-[150px] md:w-[180px]">
             <ProductCard product={product} />
           </div>
@@ -211,12 +194,39 @@ function NewArrivalsSection() {
 }
 
 function PopularPicksSection() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>('전체');
+
+  useEffect(() => {
+    fetch('/api/products/popular?pageSize=24')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.data && Array.isArray(data.data)) {
+          setProducts(data.data);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
 
   const filteredProducts =
     activeTab === '전체'
-      ? POPULAR_PRODUCTS
-      : POPULAR_PRODUCTS.filter((p) => p.category === activeTab);
+      ? products
+      : products.filter((p) => p.category === activeTab);
+
+  if (loading) {
+    return (
+      <section>
+        <h2 className="text-lg font-heading font-bold text-on-surface mb-4">인기 상품</h2>
+        <div className="grid grid-cols-2 gap-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-[280px] bg-surface-container rounded-xl animate-pulse" />
+          ))}
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section>
