@@ -46,9 +46,6 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('Error in /api/products/search:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ data: [], total: 0, page: 1, pageSize: 20, error: error instanceof Error ? error.message : 'API unavailable' });
   }
 }

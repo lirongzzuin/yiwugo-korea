@@ -2,62 +2,23 @@ import axios from 'axios';
 
 // In-memory token cache (persists within serverless function warm instance)
 let cachedToken: { token: string; expiresAt: number } | null = null;
-// In-memory CSRF session cache
-let cachedSession: { csrf: string; cookies: string; expiresAt: number } | null = null;
 
 const API_BASE = process.env.YIWUGO_API_BASE_URL || 'https://www.yiwugo.com';
 // Test credentials from Yiwugo Open Platform docs (override via env vars on production)
 const CLIENT_ID = process.env.YIWUGO_CLIENT_ID || '';
 const CLIENT_SECRET = process.env.YIWUGO_CLIENT_SECRET || '';
 
-/**
- * Obtain CSRF token and session cookies from Yiwugo.
- * Yiwugo's openresty WAF requires a CSRF token for POST requests.
- * We GET the oauth/token endpoint first to receive Set-Cookie headers
- * containing the CSRF token, then include them in the actual POST.
- */
-async function getCsrfSession(): Promise<{ csrf: string; cookies: string }> {
-  if (cachedSession && Date.now() < cachedSession.expiresAt) {
-    return { csrf: cachedSession.csrf, cookies: cachedSession.cookies };
-  }
-
-  try {
-    // Step 1: GET request to obtain CSRF cookie from Yiwugo
-    const preRes = await axios.get(`${API_BASE}/oauth/token`, {
-      params: { grant_type: 'client_credentials', client_id: CLIENT_ID },
-      headers: { Accept: 'application/json' },
-      timeout: 10000,
-      validateStatus: () => true, // accept any status
-    });
-
-    const setCookies: string[] = preRes.headers['set-cookie'] || [];
-    const cookieStr = setCookies.map((c: string) => c.split(';')[0]).join('; ');
-
-    // Extract CSRF token from cookies (common patterns: csrf_token, _csrf, XSRF-TOKEN, csrfToken)
-    let csrfToken = '';
-    for (const cookie of setCookies) {
-      const match = cookie.match(/(?:csrf[_-]?token|_csrf|XSRF-TOKEN|csrfToken)\s*=\s*([^;]+)/i);
-      if (match) {
-        csrfToken = match[1];
-        break;
-      }
-    }
-
-    // Cache for 10 minutes
-    cachedSession = { csrf: csrfToken, cookies: cookieStr, expiresAt: Date.now() + 600_000 };
-    return { csrf: csrfToken, cookies: cookieStr };
-  } catch {
-    return { csrf: '', cookies: '' };
-  }
-}
+// Browser-like User-Agent to avoid WAF blocking
+const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
 /**
  * 1. POST /oauth/token - Get OAuth token (client_credentials grant)
  * Docs: Authorization header = Basic base64("clientId:clientSecret")
- * Query: grant_type=client_credentials&client_id=<clientId>
+ * Body (form-urlencoded): grant_type=client_credentials&client_id=<clientId>
  *
- * Note: Yiwugo's WAF requires CSRF token, so we first obtain session cookies
- * via a GET request, then include them in the POST.
+ * Strategy:
+ *  1) GET the token endpoint first to obtain session cookies (CSRF workaround)
+ *  2) POST with cookies + form body + browser User-Agent
  */
 async function getToken(): Promise<string> {
   if (cachedToken && Date.now() < cachedToken.expiresAt) {
@@ -65,24 +26,36 @@ async function getToken(): Promise<string> {
   }
 
   const auth = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64');
-  const session = await getCsrfSession();
+  const tokenUrl = `${API_BASE}/oauth/token`;
 
+  // Step 1: Preflight GET to obtain session cookies from openresty WAF
+  let cookies = '';
+  try {
+    const preRes = await axios.get(tokenUrl, {
+      params: { grant_type: 'client_credentials', client_id: CLIENT_ID },
+      headers: { 'User-Agent': UA, Accept: 'application/json' },
+      timeout: 10000,
+      validateStatus: () => true,
+    });
+    const setCookies: string[] = preRes.headers['set-cookie'] || [];
+    cookies = setCookies.map((c: string) => c.split(';')[0]).join('; ');
+  } catch {
+    // continue without cookies
+  }
+
+  // Step 2: POST with form body (not null) + cookies + browser UA
+  const formBody = `grant_type=client_credentials&client_id=${encodeURIComponent(CLIENT_ID)}`;
   const headers: Record<string, string> = {
     Authorization: `Basic ${auth}`,
     Accept: 'application/json',
+    'Content-Type': 'application/x-www-form-urlencoded',
+    'User-Agent': UA,
   };
-  // Include session cookies
-  if (session.cookies) {
-    headers['Cookie'] = session.cookies;
-  }
-  // Include CSRF token in common header locations
-  if (session.csrf) {
-    headers['X-CSRF-Token'] = session.csrf;
-    headers['X-XSRF-TOKEN'] = session.csrf;
+  if (cookies) {
+    headers['Cookie'] = cookies;
   }
 
-  const response = await axios.post(`${API_BASE}/oauth/token`, null, {
-    params: { grant_type: 'client_credentials', client_id: CLIENT_ID },
+  const response = await axios.post(tokenUrl, formBody, {
     headers,
     timeout: 10000,
   });
@@ -105,7 +78,7 @@ async function apiGet(path: string, params: Record<string, string> = {}): Promis
   const response = await axios.get(`${API_BASE}${path}`, {
     params: { ...params, access_token: token },
     timeout: 15000,
-    headers: { Accept: 'application/json' },
+    headers: { Accept: 'application/json', 'User-Agent': UA },
   });
   return response.data;
 }

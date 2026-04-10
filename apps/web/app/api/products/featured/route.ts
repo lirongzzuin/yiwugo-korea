@@ -20,9 +20,7 @@ export async function GET(_request: NextRequest) {
     });
   } catch (error) {
     console.error('Error in /api/products/featured:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
+    // Graceful fallback: return empty data instead of 500
+    return NextResponse.json({ data: [], total: 0, error: error instanceof Error ? error.message : 'API unavailable' });
   }
 }

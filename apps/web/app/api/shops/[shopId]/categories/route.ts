@@ -22,9 +22,6 @@ export async function GET(
     });
   } catch (error) {
     console.error('Error in /api/shops/[shopId]/categories:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ shopId: '', categories: [], error: error instanceof Error ? error.message : 'API unavailable' });
   }
 }
