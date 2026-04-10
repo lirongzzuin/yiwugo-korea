@@ -20,6 +20,7 @@ import { YiwugoModule } from './modules/yiwugo/yiwugo.module';
 import { TranslationModule } from './modules/translation/translation.module';
 import { ExchangeRateModule } from './modules/exchange-rate/exchange-rate.module';
 
+import { ShopModule } from './modules/shop/shop.module';
 import { ProductModule } from './modules/product/product.module';
 import { CartModule } from './modules/cart/cart.module';
 import { WishlistModule } from './modules/wishlist/wishlist.module';
@@ -87,6 +88,7 @@ import { TaxModule } from './modules/tax/tax.module';
     YiwugoModule,
     TranslationModule,
     ExchangeRateModule,
+    ShopModule,
     ProductModule,
     CartModule,
     WishlistModule,

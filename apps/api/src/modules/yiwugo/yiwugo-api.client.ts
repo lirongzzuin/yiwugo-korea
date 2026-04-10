@@ -46,8 +46,9 @@ export class YiwugoApiClient {
   }
 
   /**
-   * Get OAuth token using client credentials grant
+   * Get OAuth token using client credentials grant (POST method)
    * Token is cached in Redis with TTL slightly less than expiresIn
+   * API Doc: POST /oauth/token
    */
   async getToken(): Promise<string> {
     const cacheKey = 'yiwugo:token:access';
@@ -60,19 +61,27 @@ export class YiwugoApiClient {
       const auth = Buffer.from(`${this.clientId}:${this.clientSecret}`).toString('base64');
       const url = `${this.apiBaseUrl}/oauth/token`;
 
-      const response = await this.request<any>(url, {
-        grant_type: 'client_credentials',
-        client_id: this.clientId,
-      }, {
-        'Authorization': `Basic ${auth}`,
+      await this.checkRateLimit();
+      const response = await axios.post(url, null, {
+        params: {
+          grant_type: 'client_credentials',
+          client_id: this.clientId,
+        },
+        headers: {
+          'Authorization': `Basic ${auth}`,
+          'Accept': 'application/json',
+        },
+        timeout: REQUEST_TIMEOUT_MS,
       });
+      await this.recordRateLimit();
 
-      if (!response?.data?.accessToken) {
+      const body = response.data;
+      if (!body?.data?.accessToken) {
         throw new Error('Invalid token response: missing accessToken');
       }
 
-      const token = response.data.accessToken;
-      const expiresIn = response.data.expiresIn || 20000;
+      const token = body.data.accessToken;
+      const expiresIn = body.data.expiresIn || 20000;
 
       // Cache with TTL slightly less than expiresIn to avoid using expired tokens
       await this.setCache(cacheKey, token, Math.max(CACHE_TTL.TOKEN, expiresIn - 1000));
@@ -261,20 +270,25 @@ export class YiwugoApiClient {
 
   /**
    * Search products by keyword and filters
+   * API Doc: GET /open/cn_product/list
+   * Params: q, cpage, pageSize, m (market), f (floor), shopId,
+   *         productLable, beginNumber, stp, edp, st (sort),
+   *         goodLabelFlag, onlineOrderFlag, access_token
    */
   async searchProducts(params: {
     q?: string;
     page?: number;
     pageSize?: number;
-    subMarket?: string;
-    subFloor?: string;
+    m?: string;          // 시장코드 (Market code, e.g. 1004)
+    f?: string;          // 층 (Floor)
     shopId?: string;
-    productLabel?: string;
-    minPrice?: number;
-    maxPrice?: number;
-    sort?: number; // 9=sales desc, 3=price desc, 4=price asc, 11=min order asc
-    goodLabelFlag?: string;
-    onlineOrderFlag?: string;
+    productLabel?: string; // 112=일건대발, 113=포우, 2=전공출구, 4=수입관, 1=인기
+    beginNumber?: number;  // 최소 주문 수량
+    minPrice?: number;     // 최저 가격 (stp)
+    maxPrice?: number;     // 최고 가격 (edp)
+    sort?: number;         // 9=판매량↓, 3=가격↓, 4=가격↑, 11=최소주문량↑
+    goodLabelFlag?: string; // 인기상품=1
+    onlineOrderFlag?: string; // 온라인 구매 지원
   }): Promise<any> {
     if (this.mockMode) {
       return this.getMockData('search');
@@ -297,21 +311,27 @@ export class YiwugoApiClient {
       if (params.q) queryParams.q = params.q;
       if (params.page) queryParams.cpage = String(params.page);
       if (params.pageSize) queryParams.pageSize = String(params.pageSize);
-      if (params.subMarket) queryParams.subMarket = params.subMarket;
-      if (params.subFloor) queryParams.subFloor = params.subFloor;
+      if (params.m) queryParams.m = params.m;
+      if (params.f) queryParams.f = params.f;
       if (params.shopId) queryParams.shopId = params.shopId;
       if (params.productLabel) queryParams.productLable = params.productLabel;
+      if (params.beginNumber) queryParams.beginNumber = String(params.beginNumber);
       if (params.minPrice !== undefined) queryParams.stp = String(params.minPrice);
       if (params.maxPrice !== undefined) queryParams.edp = String(params.maxPrice);
-      if (params.sort) queryParams.sort = String(params.sort);
+      if (params.sort) queryParams.st = String(params.sort);
       if (params.goodLabelFlag) queryParams.goodLabelFlag = params.goodLabelFlag;
       if (params.onlineOrderFlag) queryParams.onlineOrderFlag = params.onlineOrderFlag;
 
       const data = await this.request<any>(url, queryParams);
 
+      // API 응답의 상품 목록 키가 버전에 따라 다를 수 있음
+      const products = data?.data?.adShopTreoughTrainList
+        ?? data?.data?.prslist
+        ?? [];
+
       const result = {
         total: data?.data?.numfound ?? 0,
-        products: data?.data?.prslist ?? [],
+        products,
         subMarketList: data?.data?.subMarketList ?? [],
         categoryList: data?.data?.categoryList ?? [],
       };
@@ -365,6 +385,119 @@ export class YiwugoApiClient {
       const stale = await this.getStaleCache<any>(cacheKey);
       if (stale) {
         this.logger.warn('Returning stale cache for getProductDetail');
+        return stale;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Get shop internal category product counts
+   * API Doc: GET /open/cn_shop/shopCategorizeNum
+   * 상점 내부 카테고리별 상품 수량 조회
+   *
+   * @param shopId - 상점 ID
+   * @returns { typeProducts: [{ defineType: number, productNums: number }] }
+   */
+  async getShopCategorizeNum(shopId: string): Promise<any> {
+    if (this.mockMode) {
+      return { typeProducts: [{ defineType: 503005, productNums: 100 }] };
+    }
+
+    const cacheKey = `yiwugo:shop-categories:${shopId}`;
+
+    const cached = await this.getCache<any>(cacheKey);
+    if (cached) return cached;
+
+    try {
+      const token = await this.getToken();
+      const url = `${this.apiBaseUrl}/open/cn_shop/shopCategorizeNum`;
+
+      const data = await this.request<any>(url, {
+        access_token: token,
+        shopId,
+      });
+
+      const result = data?.data ?? { typeProducts: [] };
+      await this.setCache(cacheKey, result, CACHE_TTL.SHOP_INFO);
+      return result;
+    } catch (error) {
+      this.logger.error(`getShopCategorizeNum failed for shopId="${shopId}"`, error);
+      const stale = await this.getStaleCache<any>(cacheKey);
+      if (stale) {
+        this.logger.warn('Returning stale cache for getShopCategorizeNum');
+        return stale;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Search products within a specific shop
+   * API Doc: GET /open/cn_shop/shopSearch
+   * 상점 내부 상품 검색
+   *
+   * @param params.shopId - 상점 ID (필수)
+   * @param params.keyword - 검색어
+   * @param params.productLable - 112=일건대발
+   * @param params.dt - 필터
+   * @param params.st - 정렬: 1=최신, 9=판매량, 4=가격순, 3=가격역순
+   * @param params.cpage - 페이지 번호
+   * @param params.pagesize - 페이지당 수량
+   */
+  async searchShopProducts(params: {
+    shopId: string;
+    keyword?: string;
+    productLable?: string;
+    dt?: string;
+    st?: string;  // 1=최신, 9=판매량, 4=가격↑, 3=가격↓
+    cpage?: number;
+    pagesize?: number;
+  }): Promise<any> {
+    if (this.mockMode) {
+      return {
+        shopName: 'Mock Shop',
+        pageSize: 10,
+        productdetaillist: [],
+      };
+    }
+
+    const cacheKey = `yiwugo:shop-search:${this.hash(JSON.stringify(params))}`;
+
+    const cached = await this.getCache<any>(cacheKey);
+    if (cached) return cached;
+
+    try {
+      const token = await this.getToken();
+      const url = `${this.apiBaseUrl}/open/cn_shop/shopSearch`;
+
+      const queryParams: Record<string, string> = {
+        access_token: token,
+        shopId: params.shopId,
+      };
+
+      if (params.keyword) queryParams.keyword = params.keyword;
+      if (params.productLable) queryParams.productLable = params.productLable;
+      if (params.dt) queryParams.dt = params.dt;
+      if (params.st) queryParams.st = params.st;
+      if (params.cpage) queryParams.cpage = String(params.cpage);
+      if (params.pagesize) queryParams.pagesize = String(params.pagesize);
+
+      const data = await this.request<any>(url, queryParams);
+
+      const result = {
+        shopName: data?.data?.shopName ?? '',
+        pageSize: data?.data?.pageSize ?? 10,
+        products: data?.data?.productdetaillist ?? [],
+      };
+
+      await this.setCache(cacheKey, result, CACHE_TTL.SEARCH);
+      return result;
+    } catch (error) {
+      this.logger.error(`searchShopProducts failed for shopId="${params.shopId}"`, error);
+      const stale = await this.getStaleCache<any>(cacheKey);
+      if (stale) {
+        this.logger.warn('Returning stale cache for searchShopProducts');
         return stale;
       }
       throw error;

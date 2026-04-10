@@ -130,3 +130,16 @@ export interface Shop {
   categories?: string[];
   syncedAt: string;
 }
+
+/** Shop internal category product count (GET /open/cn_shop/shopCategorizeNum) */
+export interface ShopCategoryCount {
+  categoryId: string;
+  productCount: number;
+}
+
+/** Shop internal product search result (GET /open/cn_shop/shopSearch) */
+export interface ShopProductSearchResult {
+  shopName: string;
+  pageSize: number;
+  products: any[];
+}

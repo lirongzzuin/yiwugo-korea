@@ -142,6 +142,14 @@ function getMockData(url: string, _method: string): any {
   if (path === '/shops') {
     return { data: MOCK_SHOPS, total: MOCK_SHOPS.length };
   }
+  const shopCategoryMatch = path.match(/^\/shops\/([\w-]+)\/categories$/);
+  if (shopCategoryMatch) {
+    return { shopId: shopCategoryMatch[1], categories: [{ categoryId: '503005', productCount: 100 }] };
+  }
+  const shopProductMatch = path.match(/^\/shops\/([\w-]+)\/products$/);
+  if (shopProductMatch) {
+    return { shopName: 'Mock Shop', pageSize: 10, products: Array.from({ length: 10 }, (_, i) => generateMockProduct(i + 400)) };
+  }
   const shopMatch = path.match(/^\/shops\/([\w-]+)$/);
   if (shopMatch) {
     const shop = MOCK_SHOPS.find((s) => s.id === shopMatch[1]) || MOCK_SHOPS[0];
@@ -402,6 +410,57 @@ export const api = {
      */
     async getDetail(id: string) {
       const response = await apiClient.get(`/products/${id}`);
+      return response.data;
+    },
+  },
+
+  // Shop endpoints
+  shops: {
+    /**
+     * Search shops
+     * GET /shops/search?q=&page=&number=&subMarket=&subFloor=
+     */
+    async search(params: {
+      q?: string;
+      page?: number;
+      number?: number;
+      subMarket?: string;
+      subFloor?: string;
+    }) {
+      const response = await apiClient.get('/shops/search', { params });
+      return response.data;
+    },
+
+    /**
+     * Get shop detail
+     * GET /shops/:shopId
+     */
+    async getDetail(shopId: string) {
+      const response = await apiClient.get(`/shops/${shopId}`);
+      return response.data;
+    },
+
+    /**
+     * Get shop internal categories (product counts per category)
+     * GET /shops/:shopId/categories
+     */
+    async getCategories(shopId: string) {
+      const response = await apiClient.get(`/shops/${shopId}/categories`);
+      return response.data;
+    },
+
+    /**
+     * Search products within a shop
+     * GET /shops/:shopId/products?keyword=&st=&page=&pageSize=
+     */
+    async searchProducts(shopId: string, params: {
+      keyword?: string;
+      productLable?: string;
+      st?: string;
+      page?: number;
+      pageSize?: number;
+    }) {
+      const response = await apiClient.get(`/shops/${shopId}/products`, { params });
       return response.data;
     },
   },
