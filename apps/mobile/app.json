@@ -3,10 +3,81 @@
     "name": "이우고 코리아",
     "slug": "yiwugo-korea",
     "version": "1.0.0",
+    "runtimeVersion": "1.0.0",
     "scheme": "yiwugo",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
     "platforms": ["ios", "android"],
-    "ios": { "bundleIdentifier": "com.yiwugo.korea" },
-    "android": { "package": "com.yiwugo.korea" },
-    "plugins": ["expo-router", "expo-camera", "expo-notifications"]
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#b32008"
+    },
+    "ios": {
+      "bundleIdentifier": "com.yiwugo.korea",
+      "buildNumber": "1",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "상품 이미지 검색을 위해 카메라 접근이 필요합니다.",
+        "NSPhotoLibraryUsageDescription": "상품 이미지 검색을 위해 사진 라이브러리 접근이 필요합니다.",
+        "NSFaceIDUsageDescription": "생체 인증 로그인을 위해 Face ID 접근이 필요합니다.",
+        "CFBundleDisplayName": "이우고코리아"
+      },
+      "config": {
+        "usesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.yiwugo.korea",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#b32008"
+      },
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "INTERNET",
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE"
+      ],
+      "googleServicesFile": "./google-services.json"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "상품 이미지 검색을 위해 카메라 접근이 필요합니다."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#b32008"
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "생체 인증 로그인을 위해 Face ID가 필요합니다."
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": ""
+      },
+      "apiUrl": "https://api.yiwugo.kr",
+      "webUrl": "https://yiwugo.kr"
+    },
+    "updates": {
+      "url": ""
+    },
+    "owner": "yiwugo"
   }
 }

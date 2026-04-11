@@ -24,6 +24,14 @@ apps/mobile/android/
 apps/mobile/ios/
 *.hbc
 
+# App Store / Play Store secrets
+apps/mobile/google-services.json
+apps/mobile/play-store-key.json
+*.keystore
+*.jks
+*.p8
+*.mobileprovision
+
 # ========================================
 # Environment & Secrets (CRITICAL)
 # ========================================

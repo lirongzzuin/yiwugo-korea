@@ -569,13 +569,47 @@ yiwugo-korea/
 
 ---
 
-## 10. 라이선스
+## 10. 모바일 앱 배포
+
+### 빌드 환경
+- **Expo SDK 50** + **EAS Build** (클라우드 빌드)
+- iOS: `com.yiwugo.korea` / Android: `com.yiwugo.korea`
+
+### 빌드 명령어
+```bash
+cd apps/mobile
+
+# 개발용 (시뮬레이터)
+eas build --platform all --profile development
+
+# 내부 테스트용 (APK/IPA)
+eas build --platform all --profile preview
+
+# 스토어 제출용 (AAB/IPA)
+eas build --platform all --profile production
+```
+
+### 배포 가이드 문서
+- [Google Play Store 배포 가이드](docs/GOOGLE_PLAY_STORE_GUIDE.md)
+- [Apple App Store 배포 가이드](docs/APPLE_APP_STORE_GUIDE.md)
+
+### 필요 에셋
+| 파일 | 크기 | 용도 |
+|------|------|------|
+| `icon.png` | 1024x1024 | 앱 아이콘 (iOS/Android) |
+| `adaptive-icon.png` | 1024x1024 | Android 적응형 아이콘 |
+| `splash.png` | 1284x2778 | 스플래시 스크린 |
+| `notification-icon.png` | 96x96 | Android 알림 아이콘 |
+
+---
+
+## 12. 라이선스
 
 이 프로젝트는 비공개 프로젝트입니다. 무단 복제 및 배포를 금합니다.
 
 ---
 
-## 11. 문의
+## 13. 문의
 
 - GitHub: [lirongzzuin](https://github.com/lirongzzuin)
 - Email: 문의 시 이슈를 생성해 주세요
