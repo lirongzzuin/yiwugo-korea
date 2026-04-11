@@ -239,7 +239,7 @@ export default function ProductDetailPage() {
         {/* Price Section */}
         <div className="px-4 py-4 bg-surface-container-lowest">
           <ProductPrice
-            priceKRW={product.priceKrw}
+            priceKRW={product.priceKrw || 0}
             priceCNY={priceCny}
             size="lg"
           />
@@ -353,7 +353,7 @@ export default function ProductDetailPage() {
               <span className="material-symbols-outlined text-[18px]">add</span>
             </button>
             <span className="text-xs text-on-surface-variant ml-2">
-              합계 <span className="font-bold text-primary">{(product.priceKrw * quantity).toLocaleString()}원</span>
+              합계 <span className="font-bold text-primary">{((product.priceKrw || 0) * quantity).toLocaleString()}원</span>
             </span>
           </div>
         </div>

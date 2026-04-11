@@ -223,18 +223,18 @@ function CategoryGrid() {
 function NewArrivalsSection() {
   const [rawProducts, setRawProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchKey, setFetchKey] = useState(0);
   const translated = useTranslatedProducts(rawProducts);
-  // Use translated if available, otherwise raw
   const products = translated.length > 0 ? translated : rawProducts;
 
   useEffect(() => {
+    setLoading(true);
     fetch('/api/products/featured')
       .then((res) => res.json())
       .then((data) => {
         if (data?.data?.length > 0) {
           setRawProducts(data.data);
         } else {
-          // Fallback: general search
           return fetch('/api/products/search?pageSize=12')
             .then((r) => r.json())
             .then((d) => { if (d?.data?.length > 0) setRawProducts(d.data); });
@@ -242,7 +242,14 @@ function NewArrivalsSection() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [fetchKey]);
+
+  // Re-fetch when navigating back and products are empty
+  useEffect(() => {
+    if (!loading && rawProducts.length === 0) {
+      setFetchKey((k) => k + 1);
+    }
+  }, [loading, rawProducts.length]);
 
   if (loading) {
     return (
@@ -285,10 +292,12 @@ function PopularPicksSection() {
   const [rawProducts, setRawProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>('전체');
+  const [fetchKey, setFetchKey] = useState(0);
   const translated = useTranslatedProducts(rawProducts);
   const products = translated.length > 0 ? translated : rawProducts;
 
   useEffect(() => {
+    setLoading(true);
     fetch('/api/products/popular?pageSize=24')
       .then((res) => res.json())
       .then((data) => {
@@ -302,7 +311,11 @@ function PopularPicksSection() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [fetchKey]);
+
+  useEffect(() => {
+    if (!loading && rawProducts.length === 0) setFetchKey((k) => k + 1);
+  }, [loading, rawProducts.length]);
 
   const filteredProducts = activeTab === '전체' ? products : products.filter((p) => p.category === activeTab);
 

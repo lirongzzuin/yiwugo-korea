@@ -38,7 +38,7 @@ export default function ProductPrice({
           </span>
         )}
         <span className={cn('font-extrabold text-primary font-heading', s.main)}>
-          {priceKRW.toLocaleString()}원
+          {(priceKRW || 0).toLocaleString()}원
         </span>
         {originalPriceKRW && originalPriceKRW > priceKRW && (
           <span className={cn('line-through text-stone-400', s.original)}>

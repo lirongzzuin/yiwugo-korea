@@ -116,7 +116,7 @@ export default function ProductCard({ product, className }: ProductCardProps) {
             </span>
           )}
           {product.salesCount !== undefined && product.salesCount > 0 && (
-            <span>누적 {product.salesCount.toLocaleString()}+ 판매</span>
+            <span>누적 {(product.salesCount || 0).toLocaleString()}+ 판매</span>
           )}
         </div>
       </div>
