@@ -12,8 +12,8 @@ interface CostBreakdownProps {
 }
 
 // Fixed shipping costs (to be refined when actual logistics partnership is established)
-const AIR_SHIPPING_FIXED = 15000;  // 항공: 고정 15,000원
-const SEA_SHIPPING_FIXED = 8000;   // 해운: 고정 8,000원
+const AIR_SHIPPING_FIXED = 3000;   // 항공: 고정 3,000원
+const SEA_SHIPPING_FIXED = 1000;   // 해운: 고정 1,000원
 const COMMISSION_RATE = 0.05;      // 플랫폼 수수료 5%
 const DUTY_FREE_LIMIT_USD = 150;   // 목록통관 면세 한도 US$150
 const CUSTOMS_DUTY_RATE = 0.08;    // 관세율 8% (일반 공산품 기준)

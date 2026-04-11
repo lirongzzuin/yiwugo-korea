@@ -10,74 +10,37 @@ import { cn } from '@/lib/cn';
 
 // Chinese category name → Korean mapping (matches actual API response)
 const CATEGORY_NAME_MAP: Record<string, string> = {
-  '辅料': '부자재',
-  '配饰': '패션잡화',
-  '医疗器械': '의료기기',
-  '五金': '철물/공구',
-  '机械': '기계',
-  '鞋靴': '신발',
-  '家电': '가전',
-  '数码': '디지털',
-  '汽车用品': '자동차용품',
-  '百货': '생활잡화',
-  '母婴': '유아/출산',
-  '工艺品': '공예품',
-  '个护': '개인위생',
-  '帽子围巾': '모자/스카프',
-  '节庆礼品': '축제/선물',
-  '箱包': '가방',
-  '宠物用品': '반려동물',
-  '体育用品': '스포츠',
-  '办公文教': '사무/문구',
-  '服饰': '의류',
-  '内衣': '속옷/언더웨어',
-  '袜类': '양말',
-  '厨卫': '주방/욕실',
-  '饰品': '액세서리',
-  '玩具': '완구',
-  '地摊挑货': '시장용품',
-  '美妆': '뷰티',
-  '药品': '의약품',
+  '辅料': '부자재', '配饰': '패션잡화', '医疗器械': '의료기기', '五金': '철물/공구',
+  '机械': '기계', '鞋靴': '신발', '家电': '가전', '数码': '디지털',
+  '汽车用品': '자동차용품', '百货': '생활잡화', '母婴': '유아/출산', '工艺品': '공예품',
+  '个护': '개인위생', '帽子围巾': '모자/스카프', '节庆礼品': '축제/선물', '箱包': '가방',
+  '宠物用品': '반려동물', '体育用品': '스포츠', '办公文教': '사무/문구', '服饰': '의류',
+  '内衣': '속옷/언더웨어', '袜类': '양말', '厨卫': '주방/욕실', '饰品': '액세서리',
+  '玩具': '완구', '地摊挑货': '시장용품', '美妆': '뷰티', '药品': '의약품',
 };
 
-// Material icon mapping for categories (matches actual API response)
 const CATEGORY_ICON_MAP: Record<string, string> = {
-  '辅料': 'content_cut',
-  '配饰': 'watch',
-  '医疗器械': 'medical_services',
-  '五金': 'build',
-  '机械': 'precision_manufacturing',
-  '鞋靴': 'steps',
-  '家电': 'kitchen',
-  '数码': 'smartphone',
-  '汽车用品': 'directions_car',
-  '百货': 'storefront',
-  '母婴': 'child_care',
-  '工艺品': 'palette',
-  '个护': 'face_retouching_natural',
-  '帽子围巾': 'checkroom',
-  '节庆礼品': 'celebration',
-  '箱包': 'luggage',
-  '宠物用品': 'pets',
-  '体育用品': 'sports_soccer',
-  '办公文教': 'school',
-  '服饰': 'checkroom',
-  '内衣': 'dry_cleaning',
-  '袜类': 'footprint',
-  '厨卫': 'countertops',
-  '饰品': 'diamond',
-  '玩具': 'toys',
-  '地摊挑货': 'shopping_cart',
-  '美妆': 'spa',
-  '药品': 'medication',
+  '辅料': 'content_cut', '配饰': 'watch', '医疗器械': 'medical_services', '五金': 'build',
+  '机械': 'precision_manufacturing', '鞋靴': 'steps', '家电': 'kitchen', '数码': 'smartphone',
+  '汽车用品': 'directions_car', '百货': 'storefront', '母婴': 'child_care', '工艺品': 'palette',
+  '个护': 'face_retouching_natural', '帽子围巾': 'checkroom', '节庆礼品': 'celebration', '箱包': 'luggage',
+  '宠物用品': 'pets', '体育用品': 'sports_soccer', '办公文教': 'school', '服饰': 'checkroom',
+  '内衣': 'dry_cleaning', '袜类': 'footprint', '厨卫': 'countertops', '饰品': 'diamond',
+  '玩具': 'toys', '地摊挑货': 'shopping_cart', '美妆': 'spa', '药品': 'medication',
 };
+
+// Fallback Korean promo banners (used when API has no popular products)
+const FALLBACK_BANNERS = [
+  { title: '이우 시장 200만개 상품', subtitle: '중국 최대 도매시장 이우에서 직소싱', gradient: 'from-primary to-primary-container' },
+  { title: '실시간 환율 적용', subtitle: 'CNY→KRW 자동 환산, 관부가세 계산까지', gradient: 'from-tertiary to-tertiary-container' },
+  { title: '원스톱 물류 서비스', subtitle: '검수 → 합포장 → 통관 → 국내배송', gradient: 'from-secondary to-secondary-container' },
+];
 
 interface ApiCategory {
   id: number;
   type: string;
   entype: string;
   img?: string;
-  rank?: string;
 }
 
 const POPULAR_TABS = ['전체', '조명', '전자', '주방', '뷰티'] as const;
@@ -86,38 +49,40 @@ const POPULAR_TABS = ['전체', '조명', '전자', '주방', '뷰티'] as const
 
 function PromoBannerCarousel() {
   const [current, setCurrent] = useState(0);
-  const [rawBanners, setRawBanners] = useState<Product[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const banners = useTranslatedProducts(rawBanners);
 
   useEffect(() => {
+    // Try popular first, fallback to general search
     fetch('/api/products/popular?pageSize=5')
       .then((res) => res.json())
       .then((data) => {
-        if (data?.data && Array.isArray(data.data)) {
-          setRawBanners(data.data.slice(0, 3));
+        if (data?.data?.length > 0) {
+          setProducts(data.data.slice(0, 3));
+        } else {
+          // Fallback: fetch random products
+          return fetch('/api/products/search?pageSize=5')
+            .then((r) => r.json())
+            .then((d) => {
+              if (d?.data?.length > 0) setProducts(d.data.slice(0, 3));
+            });
         }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
+  const bannerCount = products.length > 0 ? products.length : FALLBACK_BANNERS.length;
+
   useEffect(() => {
-    if (banners.length === 0) return;
     const timer = setInterval(() => {
-      setCurrent((c) => (c + 1) % banners.length);
+      setCurrent((c) => (c + 1) % bannerCount);
     }, 4000);
     return () => clearInterval(timer);
-  }, [banners.length]);
+  }, [bannerCount]);
 
   if (loading) {
-    return (
-      <div className="aspect-[16/9] bg-surface-container rounded-2xl animate-pulse" />
-    );
-  }
-
-  if (rawBanners.length === 0) {
-    return null;
+    return <div className="aspect-[16/9] bg-surface-container rounded-2xl animate-pulse" />;
   }
 
   const gradients = [
@@ -126,6 +91,9 @@ function PromoBannerCarousel() {
     'from-secondary to-secondary-container',
   ];
 
+  // Use product banners if available, otherwise fallback
+  const hasBannerProducts = products.length > 0;
+
   return (
     <div className="relative">
       <div className="overflow-hidden rounded-2xl">
@@ -133,54 +101,44 @@ function PromoBannerCarousel() {
           className="flex transition-transform duration-500 ease-out"
           style={{ transform: `translateX(-${current * 100}%)` }}
         >
-          {banners.map((product, idx) => (
-            <Link
-              key={product.id}
-              href={`/product/${product.id}`}
-              className="w-full flex-shrink-0"
-            >
-              <div
-                className={cn(
-                  'aspect-[16/9] bg-gradient-to-br rounded-2xl p-6 md:p-10 flex flex-col justify-end relative overflow-hidden',
-                  gradients[idx % gradients.length]
-                )}
-              >
-                {product.imageUrl && (
-                  <div className="absolute inset-0 opacity-30">
-                    <img
-                      src={product.imageUrl}
-                      alt={product.name}
-                      className="w-full h-full object-cover"
-                    />
+          {hasBannerProducts
+            ? products.map((product, idx) => (
+                <Link key={product.id} href={`/product/${product.id}`} className="w-full flex-shrink-0">
+                  <div className={cn('aspect-[16/9] bg-gradient-to-br rounded-2xl p-6 md:p-10 flex flex-col justify-end relative overflow-hidden', gradients[idx % 3])}>
+                    {product.imageUrl && (
+                      <div className="absolute inset-0 opacity-30">
+                        <img src={product.imageUrl} alt="" className="w-full h-full object-cover" />
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+                    <div className="relative z-10 text-white">
+                      <h2 className="text-xl md:text-3xl font-heading font-black mb-1 line-clamp-1">{product.name}</h2>
+                      <p className="text-sm md:text-base text-white/80">
+                        {product.priceKRW > 0 ? `${product.priceKRW.toLocaleString()}원 ~ 인기 도매 상품` : '이우 인기 도매 상품'}
+                      </p>
+                    </div>
                   </div>
-                )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-                <div className="relative z-10 text-white">
-                  <h2 className="text-xl md:text-3xl font-heading font-black mb-1 line-clamp-1">
-                    {product.name}
-                  </h2>
-                  <p className="text-sm md:text-base text-white/80">
-                    {product.priceKRW > 0
-                      ? `${product.priceKRW.toLocaleString()}원 ~ 인기 도매 상품`
-                      : '이우 인기 도매 상품'}
-                  </p>
-                </div>
-              </div>
-            </Link>
-          ))}
+                </Link>
+              ))
+            : FALLBACK_BANNERS.map((banner, idx) => (
+                <Link key={idx} href="/search" className="w-full flex-shrink-0">
+                  <div className={cn('aspect-[16/9] bg-gradient-to-br rounded-2xl p-6 md:p-10 flex flex-col justify-end relative overflow-hidden', banner.gradient)}>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+                    <div className="relative z-10 text-white">
+                      <h2 className="text-xl md:text-3xl font-heading font-black mb-1">{banner.title}</h2>
+                      <p className="text-sm md:text-base text-white/80">{banner.subtitle}</p>
+                    </div>
+                  </div>
+                </Link>
+              ))}
         </div>
       </div>
       <div className="flex justify-center gap-1.5 mt-3">
-        {banners.map((_, i) => (
+        {Array.from({ length: bannerCount }).map((_, i) => (
           <button
             key={i}
             onClick={() => setCurrent(i)}
-            className={cn(
-              'h-1.5 rounded-full transition-all',
-              i === current
-                ? 'w-6 bg-primary'
-                : 'w-1.5 bg-stone-300'
-            )}
+            className={cn('h-1.5 rounded-full transition-all', i === current ? 'w-6 bg-primary' : 'w-1.5 bg-stone-300')}
           />
         ))}
       </div>
@@ -196,8 +154,8 @@ function CategoryGrid() {
     fetch('/api/categories')
       .then((res) => res.json())
       .then((data) => {
-        if (Array.isArray(data)) {
-          setCategories(data.slice(0, 10));
+        if (Array.isArray(data) && data.length > 0) {
+          setCategories(data);
         }
       })
       .catch(() => {})
@@ -217,8 +175,13 @@ function CategoryGrid() {
     );
   }
 
-  // If API categories loaded, show them; last slot is always "전체보기"
+  // Show top 9 categories + "전체보기"
   const displayCategories = categories.slice(0, 9);
+
+  // If API returned nothing, show nothing (don't block the page)
+  if (displayCategories.length === 0) {
+    return null;
+  }
 
   return (
     <div className="grid grid-cols-5 gap-2 md:gap-3">
@@ -228,17 +191,13 @@ function CategoryGrid() {
         return (
           <Link
             key={cat.id}
-            href={`/search?categoryId=${cat.id}`}
+            href={`/category/${encodeURIComponent(cat.type)}`}
             className="flex flex-col items-center gap-1.5 p-2 md:p-3 rounded-xl hover:bg-surface-container transition-colors"
           >
             <div className="w-11 h-11 md:w-12 md:h-12 rounded-full bg-primary/5 flex items-center justify-center">
-              <span className="material-symbols-outlined text-primary text-[22px] md:text-[24px]">
-                {icon}
-              </span>
+              <span className="material-symbols-outlined text-primary text-[22px] md:text-[24px]">{icon}</span>
             </div>
-            <span className="text-[11px] md:text-xs font-medium text-on-surface text-center leading-tight">
-              {koreanName}
-            </span>
+            <span className="text-[11px] md:text-xs font-medium text-on-surface text-center leading-tight">{koreanName}</span>
           </Link>
         );
       })}
@@ -247,13 +206,9 @@ function CategoryGrid() {
         className="flex flex-col items-center gap-1.5 p-2 md:p-3 rounded-xl hover:bg-surface-container transition-colors"
       >
         <div className="w-11 h-11 md:w-12 md:h-12 rounded-full bg-primary/5 flex items-center justify-center">
-          <span className="material-symbols-outlined text-primary text-[22px] md:text-[24px]">
-            more_horiz
-          </span>
+          <span className="material-symbols-outlined text-primary text-[22px] md:text-[24px]">more_horiz</span>
         </div>
-        <span className="text-[11px] md:text-xs font-medium text-on-surface text-center leading-tight">
-          전체보기
-        </span>
+        <span className="text-[11px] md:text-xs font-medium text-on-surface text-center leading-tight">전체보기</span>
       </Link>
     </div>
   );
@@ -262,14 +217,21 @@ function CategoryGrid() {
 function NewArrivalsSection() {
   const [rawProducts, setRawProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const products = useTranslatedProducts(rawProducts);
+  const translated = useTranslatedProducts(rawProducts);
+  // Use translated if available, otherwise raw
+  const products = translated.length > 0 ? translated : rawProducts;
 
   useEffect(() => {
     fetch('/api/products/featured')
       .then((res) => res.json())
       .then((data) => {
-        if (data?.data && Array.isArray(data.data)) {
+        if (data?.data?.length > 0) {
           setRawProducts(data.data);
+        } else {
+          // Fallback: general search
+          return fetch('/api/products/search?pageSize=12')
+            .then((r) => r.json())
+            .then((d) => { if (d?.data?.length > 0) setRawProducts(d.data); });
         }
       })
       .catch(() => {})
@@ -291,20 +253,15 @@ function NewArrivalsSection() {
     );
   }
 
+  if (products.length === 0) return null;
+
   return (
     <section>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-heading font-bold text-on-surface">
-          신상품
-        </h2>
-        <Link
-          href="/search?sort=newest"
-          className="text-xs text-on-surface-variant flex items-center gap-0.5 hover:text-primary transition-colors"
-        >
+        <h2 className="text-lg font-heading font-bold text-on-surface">신상품</h2>
+        <Link href="/search?sort=newest" className="text-xs text-on-surface-variant flex items-center gap-0.5 hover:text-primary transition-colors">
           더보기
-          <span className="material-symbols-outlined text-[16px]">
-            chevron_right
-          </span>
+          <span className="material-symbols-outlined text-[16px]">chevron_right</span>
         </Link>
       </div>
       <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2 -mx-4 px-4">
@@ -322,24 +279,26 @@ function PopularPicksSection() {
   const [rawProducts, setRawProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>('전체');
-  const products = useTranslatedProducts(rawProducts);
+  const translated = useTranslatedProducts(rawProducts);
+  const products = translated.length > 0 ? translated : rawProducts;
 
   useEffect(() => {
     fetch('/api/products/popular?pageSize=24')
       .then((res) => res.json())
       .then((data) => {
-        if (data?.data && Array.isArray(data.data)) {
+        if (data?.data?.length > 0) {
           setRawProducts(data.data);
+        } else {
+          return fetch('/api/products/search?pageSize=24')
+            .then((r) => r.json())
+            .then((d) => { if (d?.data?.length > 0) setRawProducts(d.data); });
         }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
-  const filteredProducts =
-    activeTab === '전체'
-      ? products
-      : products.filter((p) => p.category === activeTab);
+  const filteredProducts = activeTab === '전체' ? products : products.filter((p) => p.category === activeTab);
 
   if (loading) {
     return (
@@ -354,12 +313,12 @@ function PopularPicksSection() {
     );
   }
 
+  if (products.length === 0) return null;
+
   return (
     <section>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-heading font-bold text-on-surface">
-          인기 상품
-        </h2>
+        <h2 className="text-lg font-heading font-bold text-on-surface">인기 상품</h2>
       </div>
       <div className="flex gap-2 mb-4 overflow-x-auto scrollbar-hide">
         {POPULAR_TABS.map((tab) => (
@@ -368,9 +327,7 @@ function PopularPicksSection() {
             onClick={() => setActiveTab(tab)}
             className={cn(
               'px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors',
-              activeTab === tab
-                ? 'bg-primary text-white'
-                : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
+              activeTab === tab ? 'bg-primary text-white' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
             )}
           >
             {tab}
@@ -387,14 +344,10 @@ function TrustBanner() {
     <section className="bg-primary-container rounded-2xl p-5 md:p-8 text-white">
       <div className="flex items-start gap-4">
         <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
-          <span className="material-symbols-outlined text-[28px]">
-            local_shipping
-          </span>
+          <span className="material-symbols-outlined text-[28px]">local_shipping</span>
         </div>
         <div>
-          <h3 className="font-heading font-bold text-base md:text-lg mb-1">
-            전문 물류 서비스
-          </h3>
+          <h3 className="font-heading font-bold text-base md:text-lg mb-1">전문 물류 서비스</h3>
           <p className="text-sm text-white/80 leading-relaxed">
             이우 현지 검수 &rarr; 합포장 &rarr; 한국 통관 &rarr; 국내 배송까지.
             전 과정 추적 가능한 원스톱 물류 시스템으로 안전하게 받아보세요.
