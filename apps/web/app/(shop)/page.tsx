@@ -49,22 +49,23 @@ const POPULAR_TABS = ['전체', '조명', '전자', '주방', '뷰티'] as const
 
 function PromoBannerCarousel() {
   const [current, setCurrent] = useState(0);
-  const [products, setProducts] = useState<Product[]>([]);
+  const [rawProducts, setRawProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const translated = useTranslatedProducts(rawProducts);
+  // Use translated names when ready, otherwise show raw products
+  const products = translated.length > 0 ? translated : rawProducts;
 
   useEffect(() => {
-    // Try popular first, fallback to general search
     fetch('/api/products/popular?pageSize=5')
       .then((res) => res.json())
       .then((data) => {
         if (data?.data?.length > 0) {
-          setProducts(data.data.slice(0, 3));
+          setRawProducts(data.data.slice(0, 3));
         } else {
-          // Fallback: fetch random products
           return fetch('/api/products/search?pageSize=5')
             .then((r) => r.json())
             .then((d) => {
-              if (d?.data?.length > 0) setProducts(d.data.slice(0, 3));
+              if (d?.data?.length > 0) setRawProducts(d.data.slice(0, 3));
             });
         }
       })
@@ -72,7 +73,7 @@ function PromoBannerCarousel() {
       .finally(() => setLoading(false));
   }, []);
 
-  const bannerCount = products.length > 0 ? products.length : FALLBACK_BANNERS.length;
+  const bannerCount = rawProducts.length > 0 ? rawProducts.length : FALLBACK_BANNERS.length;
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -91,8 +92,7 @@ function PromoBannerCarousel() {
     'from-secondary to-secondary-container',
   ];
 
-  // Use product banners if available, otherwise fallback
-  const hasBannerProducts = products.length > 0;
+  const hasBannerProducts = rawProducts.length > 0;
 
   return (
     <div className="relative">
@@ -175,8 +175,14 @@ function CategoryGrid() {
     );
   }
 
-  // Show top 9 categories + "전체보기"
-  const displayCategories = categories.slice(0, 9);
+  // Sort by popularity (most products) — hardcoded priority based on Yiwugo market data
+  const PRIORITY_ORDER = ['服饰', '饰品', '百货', '箱包', '鞋靴', '玩具', '五金', '美妆', '家电', '体育用品', '数码', '厨卫', '工艺品', '办公文教', '母婴', '宠物用品', '配饰', '内衣', '袜类'];
+  const sorted = [...categories].sort((a, b) => {
+    const ia = PRIORITY_ORDER.indexOf(a.type);
+    const ib = PRIORITY_ORDER.indexOf(b.type);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  });
+  const displayCategories = sorted.slice(0, 9);
 
   // If API returned nothing, show nothing (don't block the page)
   if (displayCategories.length === 0) {
