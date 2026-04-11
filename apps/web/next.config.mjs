@@ -5,6 +5,9 @@ const nextConfig = {
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: '**.yiwugo.com' },
+      { protocol: 'http', hostname: '**.yiwugo.com' },
+      { protocol: 'http', hostname: 'img1.yiwugo.com' },
+      { protocol: 'http', hostname: 'ywgimg.yiwugo.com' },
       { protocol: 'https', hostname: '**.googleusercontent.com' },
       { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
       { protocol: 'https', hostname: 'picsum.photos' },

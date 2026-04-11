@@ -3,8 +3,8 @@ import axios from 'axios';
 // In-memory token cache (persists within serverless function warm instance)
 let cachedToken: { token: string; expiresAt: number } | null = null;
 
-const API_BASE = process.env.YIWUGO_API_BASE_URL || 'https://www.yiwugo.com';
-// Test credentials from Yiwugo Open Platform docs (override via env vars on production)
+const API_BASE = process.env.YIWUGO_API_BASE_URL || 'https://open.yiwugo.com';
+// Test credentials from Yiwugo Open Platform (override via env vars on production)
 const CLIENT_ID = process.env.YIWUGO_CLIENT_ID || '';
 const CLIENT_SECRET = process.env.YIWUGO_CLIENT_SECRET || '';
 
@@ -12,13 +12,10 @@ const CLIENT_SECRET = process.env.YIWUGO_CLIENT_SECRET || '';
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
 /**
- * 1. POST /oauth/token - Get OAuth token (client_credentials grant)
- * Docs: Authorization header = Basic base64("clientId:clientSecret")
- * Body (form-urlencoded): grant_type=client_credentials&client_id=<clientId>
- *
- * Strategy:
- *  1) GET the token endpoint first to obtain session cookies (CSRF workaround)
- *  2) POST with cookies + form body + browser User-Agent
+ * POST /oauth/token - Get OAuth token (client_credentials grant)
+ * Yiwugo Open Platform requires:
+ *  - Query params: grant_type=client_credentials&client_id=<clientId>
+ *  - Header: Authorization = base64("clientId:clientSecret") (NO "Basic " prefix)
  */
 async function getToken(): Promise<string> {
   if (cachedToken && Date.now() < cachedToken.expiresAt) {
@@ -28,42 +25,23 @@ async function getToken(): Promise<string> {
   const auth = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64');
   const tokenUrl = `${API_BASE}/oauth/token`;
 
-  // Step 1: Preflight GET to obtain session cookies from openresty WAF
-  let cookies = '';
-  try {
-    const preRes = await axios.get(tokenUrl, {
-      params: { grant_type: 'client_credentials', client_id: CLIENT_ID },
-      headers: { 'User-Agent': UA, Accept: 'application/json' },
-      timeout: 10000,
-      validateStatus: () => true,
-    });
-    const setCookies: string[] = preRes.headers['set-cookie'] || [];
-    cookies = setCookies.map((c: string) => c.split(';')[0]).join('; ');
-  } catch {
-    // continue without cookies
-  }
-
-  // Step 2: POST with form body (not null) + cookies + browser UA
-  const formBody = `grant_type=client_credentials&client_id=${encodeURIComponent(CLIENT_ID)}`;
-  const headers: Record<string, string> = {
-    Authorization: `Basic ${auth}`,
-    Accept: 'application/json',
-    'Content-Type': 'application/x-www-form-urlencoded',
-    'User-Agent': UA,
-  };
-  if (cookies) {
-    headers['Cookie'] = cookies;
-  }
-
-  const response = await axios.post(tokenUrl, formBody, {
-    headers,
+  const response = await axios.post(tokenUrl, null, {
+    params: {
+      grant_type: 'client_credentials',
+      client_id: CLIENT_ID,
+    },
+    headers: {
+      Authorization: auth,
+      Accept: 'application/json',
+      'User-Agent': UA,
+    },
     timeout: 10000,
   });
 
   const body = response.data;
   const token = body?.data?.accessToken;
   const expiresIn = body?.data?.expiresIn || 20000; // seconds
-  if (!token) throw new Error('Failed to get Yiwugo token');
+  if (!token) throw new Error('Failed to get Yiwugo token: ' + (body?.message || 'unknown'));
 
   // Cache with 60s safety margin
   cachedToken = { token, expiresAt: Date.now() + (expiresIn - 60) * 1000 };
@@ -83,10 +61,21 @@ async function apiGet(path: string, params: Record<string, string> = {}): Promis
   return response.data;
 }
 
+/**
+ * Normalize image URL: convert relative paths to absolute CDN URLs
+ */
+export function normalizeImageUrl(url: string): string {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  if (url.startsWith('//')) return 'https:' + url;
+  // Relative path like "i004/2021/..." -> absolute
+  return 'https://img1.yiwugo.com/' + url;
+}
+
 // ─── 商铺 (Shop) APIs ───────────────────────────────────────
 
 /**
- * 2. GET /open/cn_shop/list - Shop search
+ * GET /open/cn_shop/list - Shop search
  * Params: q, page, number, subMarket, subFloor, type=2 (required)
  * Response: data.num (total), data.list (shops array)
  */
@@ -106,9 +95,8 @@ export async function searchShops(params: {
 }
 
 /**
- * 3. GET /open/cn_shop/detail - Shop detail
+ * GET /open/cn_shop/detail - Shop detail
  * Params: shopId (required)
- * Response: data.{ liveList, loginId, LicenseImg, showroom, picCount, productCount, ... }
  */
 export async function getShopDetail(shopId: string) {
   const data = await apiGet('/open/cn_shop/detail', { shopId });
@@ -116,22 +104,20 @@ export async function getShopDetail(shopId: string) {
 }
 
 /**
- * 4. GET /open/cn_shop/shopCategorizeNum - Shop internal category counts
+ * GET /open/cn_shop/shopCategorizeNum - Shop internal category counts
  * Params: shopId (required)
- * Response: data.data.typeProducts[] — NOTE: double nested!
- *   Each item: { defineType (category id), productNums (count) }
+ * Response: data.typeProducts[] — { defineType, productNums }
  */
 export async function getShopCategorizeNum(shopId: string) {
   const data = await apiGet('/open/cn_shop/shopCategorizeNum', { shopId });
-  // Response structure: { code, message, data: { code, data: { typeProducts }, message } }
-  return data?.data?.data ?? { typeProducts: [] };
+  return data?.data ?? { typeProducts: [] };
 }
 
 /**
- * 5. GET /open/cn_shop/shopSearch - Shop internal product search
+ * GET /open/cn_shop/shopSearch - Shop internal product search
  * Params: shopId, productLable, dt, st (sort), keyword, cpage, pagesize
  *   st: 1=newest, 9=sales, 4=priceAsc, 3=priceDesc
- * Response: data.{ pageSize, shopName, productdetaillist[] }
+ * Response: data.{ pageSize, shopName, productdetaillist[], totalCount }
  */
 export async function searchShopProducts(params: {
   shopId: string; keyword?: string; productLable?: string;
@@ -149,6 +135,7 @@ export async function searchShopProducts(params: {
   return {
     shopName: data?.data?.shopName ?? '',
     pageSize: data?.data?.pageSize ?? 10,
+    totalCount: data?.data?.totalCount ?? 0,
     products: data?.data?.productdetaillist ?? [],
   };
 }
@@ -156,13 +143,13 @@ export async function searchShopProducts(params: {
 // ─── 商品 (Product) APIs ────────────────────────────────────
 
 /**
- * 6. GET /open/cn_product/list - Product search
+ * GET /open/cn_product/list - Product search
  * Params: q (keyword), cpage, pageSize, m (market), f (floor), shopId,
- *   productLable (112=dropship, 113=print, 2=export, 4=import, 1=hot),
- *   beginNumber (MOQ), stp (min price), edp (max price),
- *   st (sort: 9=sales desc, 3=price desc, 4=price asc, 11=MOQ asc),
+ *   productLable (112=dropship, 113=freeShipping, 2=export, 4=import, 1=hot),
+ *   beginNumber (MOQ), stp (min price in 分), edp (max price in 分),
+ *   st (sort: 9=sales desc, 3=price desc, 4=price asc),
  *   goodLabelFlag (1=featured), onlineOrderFlag (1=online purchase)
- * Response: data.{ numfound, adShopTreoughTrainList[] }
+ * Response: data.{ numfound, prslist[], adShopTreoughTrainList[], subMarketList[], categoryList[] }
  */
 export async function searchProducts(params: {
   q?: string; cpage?: number; pageSize?: number;
@@ -189,28 +176,28 @@ export async function searchProducts(params: {
   const data = await apiGet('/open/cn_product/list', query);
   return {
     total: data?.data?.numfound ?? 0,
-    products: data?.data?.adShopTreoughTrainList ?? data?.data?.prslist ?? [],
+    products: data?.data?.prslist ?? [],
+    adShops: data?.data?.adShopTreoughTrainList ?? [],
+    subMarketList: data?.data?.subMarketList ?? [],
+    categoryList: data?.data?.categoryList ?? [],
   };
 }
 
 /**
- * 7. GET /open/cn_product/detail - Product detail
+ * GET /open/cn_product/detail - Product detail
  * Params: productId (required)
- * Response: data.{ dealQuantitys, exchangeService, defaultFreight, loginId,
- *   smallNum (MOQ), totalprice (price in CNY), propertyList[], ... }
  */
 export async function getProductDetail(productId: string) {
-  const data = await apiGet('/open/cn_product/detail', { productId });
+  const data = await apiGet('/open/cn_product/detail', { productId: productId });
   return data?.data ?? null;
 }
 
 // ─── 常用 (Common) APIs ─────────────────────────────────────
 
 /**
- * 8. GET /open/categorize/product - Product categories
- * Params: upperType (optional - if empty returns large categories, if set returns subcategories),
- *   webType: cn/en (required)
- * Response: data.list[] — each: { img, typeUrl, upperType, rank, typeId, id, productTypeList }
+ * GET /open/categorize/product - Product categories
+ * Params: upperType (optional), webType: cn/en (required)
+ * Response: data.list[]
  */
 export async function getCategories(upperType?: string, webType: string = 'cn') {
   const query: Record<string, string> = { webType };
@@ -221,8 +208,7 @@ export async function getCategories(upperType?: string, webType: string = 'cn') 
 }
 
 /**
- * 9. GET /open/categorize/market - Market classification list
- * Params: access_token only
+ * GET /open/categorize/market - Market classification list
  * Response: data.{ marketList[]: { marketEnName, marketCode } }
  */
 export async function getMarkets() {

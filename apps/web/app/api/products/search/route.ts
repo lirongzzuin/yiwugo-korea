@@ -4,6 +4,17 @@ import { mapProduct } from '../../utils';
 
 export const dynamic = 'force-dynamic';
 
+async function getExchangeRate(): Promise<number> {
+  try {
+    const res = await fetch('https://open.er-api.com/v6/latest/CNY', { next: { revalidate: 300 } });
+    if (res.ok) {
+      const json = await res.json();
+      if (json.rates?.KRW) return Math.round(json.rates.KRW * 100) / 100;
+    }
+  } catch { /* fallback */ }
+  return 190;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
@@ -17,13 +28,14 @@ export async function GET(request: NextRequest) {
     const categoryId = searchParams.get('categoryId') || '';
     const shopId = searchParams.get('shopId') || '';
 
-    // Map frontend params to Yiwugo API params
+    // Map frontend sort keys to Yiwugo API st values
     const sortMap: Record<string, number> = {
-      popular: 9,
-      newest: 0,
-      priceAsc: 1,
-      priceDesc: 2,
+      popular: 9,    // sales desc
+      priceAsc: 4,   // price asc
+      priceDesc: 3,  // price desc
     };
+
+    const rate = await getExchangeRate();
 
     const result = await yiwugo.searchProducts({
       q: q || undefined,
@@ -36,7 +48,7 @@ export async function GET(request: NextRequest) {
       shopId: shopId || undefined,
     });
 
-    const items = (result.products || []).map((item: any) => mapProduct(item, 180));
+    const items = (result.products || []).map((item: any) => mapProduct(item, rate));
 
     return NextResponse.json({
       data: items,

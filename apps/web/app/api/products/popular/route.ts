@@ -8,13 +8,14 @@ export async function GET(request: NextRequest) {
   try {
     const pageSize = parseInt(request.nextUrl.searchParams.get('pageSize') || '20', 10);
 
+    // st=9 means sort by sales count (판매량순)
     const result = await yiwugo.searchProducts({
       st: 9,
       cpage: 1,
       pageSize,
     });
 
-    const items = (result.products || []).map((item: any) => mapProduct(item, 180));
+    const items = (result.products || []).map((item: any) => mapProduct(item));
 
     return NextResponse.json({
       data: items,

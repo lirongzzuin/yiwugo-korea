@@ -6,13 +6,14 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(_request: NextRequest) {
   try {
+    // Fetch popular/hot products as "featured" — productLable=1 means 热卖 (hot)
     const result = await yiwugo.searchProducts({
-      goodLabelFlag: '1',
+      productLable: '1',
       cpage: 1,
       pageSize: 12,
     });
 
-    const items = (result.products || []).map((item: any) => mapProduct(item, 180));
+    const items = (result.products || []).map((item: any) => mapProduct(item));
 
     return NextResponse.json({
       data: items,
@@ -20,7 +21,6 @@ export async function GET(_request: NextRequest) {
     });
   } catch (error) {
     console.error('Error in /api/products/featured:', error);
-    // Graceful fallback: return empty data instead of 500
     return NextResponse.json({ data: [], total: 0, error: error instanceof Error ? error.message : 'API unavailable' });
   }
 }
