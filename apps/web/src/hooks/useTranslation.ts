@@ -23,8 +23,7 @@ export function useTranslatedProducts<T extends { name: string }>(products: T[])
 
   useEffect(() => {
     if (!products || products.length === 0) {
-      setTranslated([]);
-      return;
+      return; // Don't reset to empty — keep previous state
     }
 
     // Create a stable key to avoid duplicate requests

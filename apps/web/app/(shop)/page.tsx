@@ -124,7 +124,7 @@ function PromoBannerCarousel() {
     );
   }
 
-  if (banners.length === 0) {
+  if (rawBanners.length === 0) {
     return null;
   }
 
