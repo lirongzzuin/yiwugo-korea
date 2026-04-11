@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Manrope, Be_Vietnam_Pro } from 'next/font/google';
 import '@/styles/globals.css';
+import ScrollToTop from '@/components/common/ScrollToTop';
 
 const manrope = Manrope({
   subsets: ['latin', 'vietnamese'],
@@ -70,6 +71,7 @@ export default function RootLayout({
       </head>
       <body className="antialiased min-h-screen bg-surface text-on-surface font-body">
         {children}
+        <ScrollToTop />
       </body>
     </html>
   );

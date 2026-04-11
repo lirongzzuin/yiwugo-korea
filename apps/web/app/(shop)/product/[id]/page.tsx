@@ -9,9 +9,11 @@ import CostBreakdown from '@/components/product/CostBreakdown';
 import ImportDisclaimer from '@/components/product/ImportDisclaimer';
 import SizeGuide from '@/components/product/SizeGuide';
 import RecommendedProducts from '@/components/product/RecommendedProducts';
+import RecentlyViewed from '@/components/product/RecentlyViewed';
 import { useCartStore } from '@/stores/cart-store';
 import { useWishlistStore } from '@/stores/wishlist-store';
 import { useUIStore } from '@/stores/ui-store';
+import { useRecentStore } from '@/stores/recent-store';
 
 const MOCK_REVIEWS = [
   { id: '1', user: '김**', rating: 5, date: '2026-03-28', content: '품질 좋고 색상이 예뻐요. 대량 주문에도 일관된 품질입니다.', tags: ['품질 좋음', '색상 정확'] },
@@ -81,6 +83,7 @@ export default function ProductDetailPage() {
   const toggleWishlist = useWishlistStore((s) => s.toggleItem);
   const isWishlisted = useWishlistStore((s) => s.isWishlisted(productId));
   const showToast = useUIStore((s) => s.showToast);
+  const addRecentItem = useRecentStore((s: any) => s.addItem);
 
   const [tr, setTr] = useState<Record<string, string>>({});
 
@@ -97,6 +100,16 @@ export default function ProductDetailPage() {
         if (data && !data.error) {
           setProduct(data);
           setQuantity(data.minOrder || 10);
+          // 최근 본 상품에 기록
+          addRecentItem({
+            id: String(data.id || productId),
+            name: data.title || '',
+            imageUrl: data.images?.[0] || data.imageUrl || '',
+            priceKRW: data.priceKrw || 0,
+            priceCNY: parseFloat(data.priceCny) || 0,
+            category: data.categoryName || '',
+            viewedAt: new Date().toISOString(),
+          });
           const texts: string[] = [
             data.title || '',
             data.shopName || '',
@@ -749,6 +762,11 @@ export default function ProductDetailPage() {
             limit={8}
             title="함께 구매한 상품"
           />
+        </div>
+
+        {/* Recently Viewed */}
+        <div className="mx-4 mb-6">
+          <RecentlyViewed excludeId={productId} maxItems={8} />
         </div>
       </div>
 

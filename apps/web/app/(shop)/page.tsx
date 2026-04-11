@@ -6,6 +6,7 @@ import ExchangeRateBanner from '@/components/common/ExchangeRateBanner';
 import ProductCard, { type Product } from '@/components/product/ProductCard';
 import ProductGrid from '@/components/product/ProductGrid';
 import RecommendedProducts from '@/components/product/RecommendedProducts';
+import RecentlyViewed from '@/components/product/RecentlyViewed';
 import { useTranslatedProducts } from '@/hooks/useTranslation';
 import { cn } from '@/lib/cn';
 
@@ -481,6 +482,7 @@ export default function HomePage() {
           limit={12}
           title="맞춤 추천 상품"
         />
+        <RecentlyViewed maxItems={10} />
         <PopularPicksSection />
       </div>
     </>
