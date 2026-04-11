@@ -279,6 +279,46 @@ export class AuthService {
     return { message: '비밀번호 재설정 코드가 이메일로 전송되었습니다.' };
   }
 
+  // ─── Email Verification ──────────────────────────────────
+
+  async sendVerificationEmail(email: string) {
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const redisKey = `email_verify:${email}`;
+    await this.redisService.set(redisKey, code, 300); // 5분 TTL
+
+    // TODO: 실제 이메일 발송 서비스 연동
+    this.logger.log(`Email verification code for ${email}: ${code}`);
+
+    return { message: '인증 코드가 이메일로 전송되었습니다.' };
+  }
+
+  async verifyEmail(email: string, code: string) {
+    const redisKey = `email_verify:${email}`;
+    const storedCode = await this.redisService.get(redisKey);
+
+    if (!storedCode || storedCode !== code) {
+      throw new BadRequestException('인증 코드가 유효하지 않거나 만료되었습니다.');
+    }
+
+    await this.redisService.del(redisKey);
+
+    // 이미 가입된 사용자의 이메일 인증 상태 업데이트
+    const user = await this.userService.findByEmail(email);
+    if (user) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { isEmailVerified: true },
+      });
+    }
+
+    return { message: '이메일 인증이 완료되었습니다.', verified: true };
+  }
+
+  async checkEmailExists(email: string) {
+    const user = await this.userService.findByEmail(email);
+    return { exists: !!user };
+  }
+
   // ─── Reset Password ─────────────────────────────────────
 
   async resetPassword(email: string, code: string, newPassword: string) {

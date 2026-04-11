@@ -7,9 +7,36 @@ import { cn } from '@/lib/cn';
 import { useAuthStore } from '@/stores/auth-store';
 import { useUIStore } from '@/stores/ui-store';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
+// OAuth 설정
+const OAUTH_CONFIG = {
+  kakao: {
+    clientId: process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID || '',
+    redirectUri: typeof window !== 'undefined'
+      ? `${window.location.origin}/auth/callback/kakao`
+      : '',
+    authUrl: 'https://kauth.kakao.com/oauth/authorize',
+  },
+  naver: {
+    clientId: process.env.NEXT_PUBLIC_NAVER_CLIENT_ID || '',
+    redirectUri: typeof window !== 'undefined'
+      ? `${window.location.origin}/auth/callback/naver`
+      : '',
+    authUrl: 'https://nid.naver.com/oauth2.0/authorize',
+  },
+  apple: {
+    clientId: process.env.NEXT_PUBLIC_APPLE_CLIENT_ID || '',
+    redirectUri: typeof window !== 'undefined'
+      ? `${window.location.origin}/auth/callback/apple`
+      : '',
+    authUrl: 'https://appleid.apple.com/auth/authorize',
+  },
+};
+
 export default function LoginPage() {
   const router = useRouter();
-  const login = useAuthStore((s) => s.login);
+  const apiLogin = useAuthStore((s) => s.apiLogin);
   const showToast = useUIStore((s) => s.showToast);
 
   const [email, setEmail] = useState('');
@@ -17,7 +44,7 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [errors, setErrors] = useState<{ email?: string; password?: string; general?: string }>({});
 
   const validate = () => {
     const newErrors: { email?: string; password?: string } = {};
@@ -41,24 +68,58 @@ export default function LoginPage() {
     e.preventDefault();
     if (!validate()) return;
     setIsLoading(true);
+    setErrors({});
 
-    // Mock login - simulate API call
-    setTimeout(() => {
-      login({
-        id: 'user-1',
-        name: '홍길동',
-        email: email,
-        memberType: 'INDIVIDUAL',
-        points: 3200,
-      });
-      setIsLoading(false);
+    try {
+      await apiLogin(email, password, rememberMe);
       showToast('로그인 되었습니다', 'success');
       router.push('/');
-    }, 1000);
+    } catch (error: any) {
+      const msg = error.message || '로그인에 실패했습니다';
+      if (msg.includes('비밀번호') || msg.includes('이메일')) {
+        setErrors({ general: msg });
+      } else if (msg.includes('잠금') || msg.includes('lock')) {
+        setErrors({ general: '로그인 시도 횟수를 초과했습니다. 15분 후 다시 시도해주세요.' });
+      } else {
+        setErrors({ general: msg });
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleSocialLogin = (provider: string) => {
-    showToast(`${provider} 로그인은 준비 중입니다`, 'info');
+  const handleSocialLogin = (provider: 'kakao' | 'naver' | 'apple') => {
+    const config = OAUTH_CONFIG[provider];
+
+    // OAuth 인가 코드 방식으로 리다이렉트
+    if (!config.clientId) {
+      // 클라이언트 ID가 설정되지 않은 경우 → 백엔드 직접 호출 방식
+      const state = Math.random().toString(36).substring(2);
+      sessionStorage.setItem('oauth_state', state);
+      window.location.href = `${API_URL}/auth/${provider}?state=${state}&redirect=${encodeURIComponent(window.location.origin + '/auth/callback/' + provider)}`;
+      return;
+    }
+
+    const state = Math.random().toString(36).substring(2);
+    sessionStorage.setItem('oauth_state', state);
+
+    const params = new URLSearchParams({
+      client_id: config.clientId,
+      redirect_uri: config.redirectUri,
+      response_type: 'code',
+      state,
+    });
+
+    if (provider === 'kakao') {
+      params.set('scope', 'profile_nickname,account_email');
+    } else if (provider === 'naver') {
+      // naver uses default scope
+    } else if (provider === 'apple') {
+      params.set('scope', 'email name');
+      params.set('response_mode', 'form_post');
+    }
+
+    window.location.href = `${config.authUrl}?${params.toString()}`;
   };
 
   return (
@@ -84,7 +145,7 @@ export default function LoginPage() {
       {/* Social Login Buttons */}
       <div className="flex flex-col gap-3">
         <button
-          onClick={() => handleSocialLogin('카카오')}
+          onClick={() => handleSocialLogin('kakao')}
           className="relative flex items-center justify-center w-full h-12 rounded-xl font-semibold text-sm transition-all duration-200 hover:opacity-90 active:scale-[0.98]"
           style={{ backgroundColor: '#FEE500', color: '#191919' }}
         >
@@ -95,18 +156,16 @@ export default function LoginPage() {
         </button>
 
         <button
-          onClick={() => handleSocialLogin('네이버')}
+          onClick={() => handleSocialLogin('naver')}
           className="relative flex items-center justify-center w-full h-12 rounded-xl font-semibold text-sm text-white transition-all duration-200 hover:opacity-90 active:scale-[0.98]"
           style={{ backgroundColor: '#03C75A' }}
         >
-          <svg className="absolute left-4 w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M16.27 10.35h-1.42V8.5h1.42v1.85zm-5.17 0h1.42V6.12h-1.42v4.23zm-3.85-.57l-.78-1.81-.78 1.81H7.25zm6.12.57h1.42V6.12L12.7 9.3l-.63-1.46V6.12H10.65v4.23h1.42l.63-1.47.63 1.47h1.42zm-7.55 0l.28-.66H8.1l.28.66h1.56L7.85 6.12H6.33L4.25 10.35H5.82z" transform="translate(0,3)"/>
-          </svg>
+          <span className="absolute left-4 text-lg font-black">N</span>
           네이버로 시작하기
         </button>
 
         <button
-          onClick={() => handleSocialLogin('Apple')}
+          onClick={() => handleSocialLogin('apple')}
           className="relative flex items-center justify-center w-full h-12 rounded-xl font-semibold text-sm text-white bg-black transition-all duration-200 hover:opacity-90 active:scale-[0.98]"
         >
           <svg className="absolute left-4 w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -119,9 +178,17 @@ export default function LoginPage() {
       {/* Divider */}
       <div className="flex items-center gap-4 my-7">
         <div className="flex-1 h-px bg-outline-variant/50" />
-        <span className="text-xs text-on-surface-variant font-medium">또는</span>
+        <span className="text-xs text-on-surface-variant font-medium">또는 이메일로 로그인</span>
         <div className="flex-1 h-px bg-outline-variant/50" />
       </div>
+
+      {/* General error */}
+      {errors.general && (
+        <div className="flex items-center gap-2 p-3 mb-3 rounded-xl bg-error/10 border border-error/20">
+          <span className="material-symbols-outlined text-error text-[18px]">error</span>
+          <p className="text-sm text-error">{errors.general}</p>
+        </div>
+      )}
 
       {/* Email/Password Form */}
       <form onSubmit={handleLogin} className="flex flex-col gap-3">
@@ -161,6 +228,7 @@ export default function LoginPage() {
             type="button"
             onClick={() => setShowPassword(!showPassword)}
             className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant"
+            aria-label={showPassword ? '비밀번호 숨기기' : '비밀번호 보기'}
           >
             <span className="material-symbols-outlined text-[20px]">
               {showPassword ? 'visibility_off' : 'visibility'}

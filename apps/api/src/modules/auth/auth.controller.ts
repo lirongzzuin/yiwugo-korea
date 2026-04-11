@@ -159,6 +159,30 @@ export class AuthController {
     return this.authService.validateUser(user.sub);
   }
 
+  @Public()
+  @Get('check-email')
+  @ApiOperation({ summary: '이메일 중복 확인' })
+  async checkEmail(@Req() req: Request) {
+    const email = (req as any).query?.email || new URL(req.url || '', 'http://localhost').searchParams.get('email');
+    return this.authService.checkEmailExists(email || '');
+  }
+
+  @Public()
+  @Post('send-verification')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '이메일 인증 코드 발송' })
+  async sendVerification(@Body() body: { email: string }) {
+    return this.authService.sendVerificationEmail(body.email);
+  }
+
+  @Public()
+  @Post('verify-email')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '이메일 인증 코드 확인' })
+  async verifyEmail(@Body() body: { email: string; code: string }) {
+    return this.authService.verifyEmail(body.email, body.code);
+  }
+
   // ─── Private Helpers ────────────────────────────────────
 
   private setRefreshTokenCookie(
