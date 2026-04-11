@@ -341,7 +341,16 @@ function PopularPicksSection() {
       }
 
       if (append) {
-        setRawProducts((prev) => [...prev, ...items]);
+        // 중복 상품 제거
+        setRawProducts((prev) => {
+          const existingIds = new Set(prev.map((p) => p.id));
+          const newItems = items.filter((p: Product) => !existingIds.has(p.id));
+          if (newItems.length === 0) {
+            setHasMore(false);
+            return prev;
+          }
+          return [...prev, ...newItems];
+        });
       } else {
         setRawProducts(items);
       }

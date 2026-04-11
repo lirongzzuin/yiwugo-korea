@@ -95,7 +95,15 @@ function SearchPageContent() {
 
       if (data?.data && Array.isArray(data.data)) {
         if (append) {
-          setRawProducts((prev) => [...prev, ...data.data]);
+          setRawProducts((prev) => {
+            const existingIds = new Set(prev.map((p) => p.id));
+            const newItems = data.data.filter((p: Product) => !existingIds.has(p.id));
+            if (newItems.length === 0) {
+              setHasMore(false);
+              return prev;
+            }
+            return [...prev, ...newItems];
+          });
         } else {
           setRawProducts(data.data);
         }
