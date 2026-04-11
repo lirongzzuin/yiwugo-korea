@@ -1,53 +1,132 @@
+# ========================================
 # Dependencies
+# ========================================
 node_modules/
 .pnp
 .pnp.js
+.yarn/
 
+# ========================================
 # Build outputs
+# ========================================
 dist/
 build/
 .next/
 out/
+*.tsbuildinfo
 
 # Turbo
 .turbo/
 
-# Environment files
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# Expo / React Native
+apps/mobile/.expo/
+apps/mobile/android/
+apps/mobile/ios/
+*.hbc
 
+# ========================================
+# Environment & Secrets (CRITICAL)
+# ========================================
+.env
+.env.*
+!.env.example
+
+# API keys, credentials, secrets
+*.pem
+*.key
+*.cert
+*.p12
+*.pfx
+credentials.json
+service-account*.json
+secrets/
+.secrets/
+
+# ========================================
 # Database
+# ========================================
 prisma/*.db
 prisma/*.db-journal
+*.sqlite
+*.sqlite3
+dump.sql
+*.dump
 
-# Testing
+# ========================================
+# Testing & Coverage
+# ========================================
 coverage/
+.nyc_output/
+jest-results/
+test-results/
+*.lcov
 
-# IDE
+# ========================================
+# IDE & Editor
+# ========================================
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+*.sublime-project
+*.sublime-workspace
+.project
+.classpath
+.settings/
 
-# OS
+# ========================================
+# OS generated files
+# ========================================
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
 
+# ========================================
 # Logs
+# ========================================
 *.log
+logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
+pids/
+*.pid
+*.seed
+*.pid.lock
 
-# Misc
-*.tsbuildinfo
+# ========================================
+# Package manager
+# ========================================
 *.tgz
+package-lock.json.bak
+
+# ========================================
+# Cache
+# ========================================
 .eslintcache
 .cache/
+.parcel-cache/
 tmp/
 temp/
+
+# ========================================
+# Uploads & User generated content
+# ========================================
+uploads/
+public/uploads/
+static/uploads/
+
+# ========================================
+# Misc
+# ========================================
+*.map
+.vercel
+.netlify

@@ -43,10 +43,7 @@ import { SettlementModule } from './modules/settlement/settlement.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { TaxModule } from './modules/tax/tax.module';
-
-// TODO: Import these modules as they are implemented
-// import { ReviewModule } from './modules/review/review.module';
-// import { NotificationModule } from './modules/notification/notification.module';
+import { RecommendationModule } from './modules/recommendation/recommendation.module';
 
 @Module({
   imports: [
@@ -108,6 +105,7 @@ import { TaxModule } from './modules/tax/tax.module';
     AuditModule,
     TaxModule,
     SettlementModule,
+    RecommendationModule,
   ],
 })
 export class AppModule {}

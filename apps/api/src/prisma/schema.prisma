@@ -739,6 +739,47 @@ model TranslationCache {
   @@map("translation_cache")
 }
 
+// ─── Recommendation / User Behavior ─────────────────────
+
+enum UserActionType {
+  VIEW
+  CLICK
+  WISHLIST
+  CART
+  PURCHASE
+  SEARCH
+}
+
+model UserActivity {
+  id         String         @id @default(uuid())
+  userId     String
+  productId  String?
+  categoryId String?
+  actionType UserActionType
+  metadata   Json?
+  createdAt  DateTime       @default(now())
+
+  @@index([userId, actionType, createdAt])
+  @@index([userId, categoryId])
+  @@index([productId, actionType])
+  @@index([createdAt])
+  @@map("user_activities")
+}
+
+model UserPreference {
+  id               String   @id @default(uuid())
+  userId           String   @unique
+  categoryScores   Json     @default("{}")
+  priceRangeLow    Decimal? @db.Decimal(14, 0)
+  priceRangeHigh   Decimal? @db.Decimal(14, 0)
+  favoriteShopIds  String[] @default([])
+  lastComputedAt   DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([userId])
+  @@map("user_preferences")
+}
+
 // ─── System Settings ─────────────────────────────────────
 
 model SystemSetting {

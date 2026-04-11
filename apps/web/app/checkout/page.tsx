@@ -1,8 +1,11 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/cn';
+import { loadTossPayments, TossPaymentsWidgets } from '@tosspayments/tosspayments-sdk';
+
+const TOSS_CLIENT_KEY = process.env.NEXT_PUBLIC_TOSS_PAYMENTS_CLIENT_KEY || 'test_ck_your_client_key';
 
 const MOCK_ITEMS = [
   {
@@ -47,10 +50,17 @@ const DUTY_FREE_LIMIT_USD = 150;
 const CUSTOMS_DUTY_RATE = 0.08;
 const VAT_RATE = 0.10;
 
+function generateOrderId() {
+  const now = new Date();
+  const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+  const rand = Math.random().toString(36).substring(2, 8).toUpperCase();
+  return `YK${dateStr}${rand}`;
+}
+
 export default function CheckoutPage() {
   const router = useRouter();
   const [isOrderExpanded, setIsOrderExpanded] = useState(true);
-  const [selectedPayment, setSelectedPayment] = useState('tosspay');
+  const [selectedPayment, setSelectedPayment] = useState('card');
   const [customsNumber, setCustomsNumber] = useState('');
   const [couponCode, setCouponCode] = useState('');
   const [usePoints, setUsePoints] = useState('');
@@ -59,6 +69,15 @@ export default function CheckoutPage() {
   const [agreeRefund, setAgreeRefund] = useState(false);
   const [shippingMethod, setShippingMethod] = useState<'AIR' | 'SEA'>('AIR');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+
+  // Toss Payments Widgets
+  const [widgets, setWidgets] = useState<TossPaymentsWidgets | null>(null);
+  const [widgetsReady, setWidgetsReady] = useState(false);
+  const paymentMethodRef = useRef<HTMLDivElement>(null);
+  const agreementRef = useRef<HTMLDivElement>(null);
+
+  const orderIdRef = useRef(generateOrderId());
 
   const costs = useMemo(() => {
     const subtotal = MOCK_ITEMS.reduce((sum, item) => sum + item.priceKRW * item.quantity, 0);
@@ -90,6 +109,59 @@ export default function CheckoutPage() {
     };
   }, [shippingMethod, usePoints]);
 
+  // Initialize Toss Payments Widgets
+  useEffect(() => {
+    async function initWidgets() {
+      try {
+        const tossPayments = await loadTossPayments(TOSS_CLIENT_KEY);
+        const w = tossPayments.widgets({
+          customerKey: 'ANONYMOUS',
+        });
+        setWidgets(w);
+      } catch (err) {
+        console.error('Toss Payments SDK 초기화 실패:', err);
+      }
+    }
+    initWidgets();
+  }, []);
+
+  // Render Toss widgets when ready
+  useEffect(() => {
+    if (!widgets) return;
+
+    async function renderWidgets() {
+      try {
+        await widgets!.setAmount({ currency: 'KRW', value: costs.total });
+
+        if (paymentMethodRef.current) {
+          await widgets!.renderPaymentMethods({
+            selector: '#toss-payment-method',
+            variantKey: 'DEFAULT',
+          });
+        }
+
+        if (agreementRef.current) {
+          await widgets!.renderAgreement({
+            selector: '#toss-agreement',
+            variantKey: 'AGREEMENT',
+          });
+        }
+
+        setWidgetsReady(true);
+      } catch (err) {
+        console.error('Toss 위젯 렌더링 실패:', err);
+      }
+    }
+    renderWidgets();
+  }, [widgets]);
+
+  // Update amount when costs change
+  useEffect(() => {
+    if (widgets && widgetsReady) {
+      widgets.setAmount({ currency: 'KRW', value: costs.total });
+    }
+  }, [costs.total, widgets, widgetsReady]);
+
   const handleAgreeAll = () => {
     const next = !agreeAll;
     setAgreeAll(next);
@@ -99,10 +171,41 @@ export default function CheckoutPage() {
 
   const handleSubmit = async () => {
     if (!agreeOrder || !agreeRefund) return;
+    if (!widgets) {
+      setPaymentError('결제 시스템을 불러오는 중입니다. 잠시 후 다시 시도해주세요.');
+      return;
+    }
+
     setIsSubmitting(true);
-    // Simulate payment processing
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    router.push('/checkout/success');
+    setPaymentError(null);
+
+    try {
+      const orderName = MOCK_ITEMS.length > 1
+        ? `${MOCK_ITEMS[0].name} 외 ${MOCK_ITEMS.length - 1}건`
+        : MOCK_ITEMS[0].name;
+
+      await widgets.requestPayment({
+        orderId: orderIdRef.current,
+        orderName,
+        successUrl: `${window.location.origin}/checkout/success`,
+        failUrl: `${window.location.origin}/checkout/fail`,
+        customerEmail: 'customer@example.com',
+        customerName: '홍길동',
+      });
+    } catch (error: any) {
+      // 사용자가 결제를 취소한 경우
+      if (error.code === 'USER_CANCEL') {
+        setPaymentError(null);
+      } else if (error.code === 'INVALID_ORDER_ID') {
+        // 주문 ID가 이미 사용됨 - 새로 생성
+        orderIdRef.current = generateOrderId();
+        setPaymentError('주문 ID가 갱신되었습니다. 다시 결제 버튼을 눌러주세요.');
+      } else {
+        setPaymentError(error.message || '결제 처리 중 오류가 발생했습니다.');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -297,39 +400,24 @@ export default function CheckoutPage() {
           </section>
         )}
 
-        {/* Section 5: 결제 수단 */}
+        {/* Section 5: Toss 결제 위젯 */}
         <section className="bg-white rounded-2xl p-5 shadow-soft">
           <h2 className="font-heading font-bold text-base mb-4 flex items-center gap-2">
             <span className="material-symbols-outlined text-primary text-[20px]">payments</span>
             결제 수단
           </h2>
-          <div className="grid grid-cols-2 gap-2">
-            {PAYMENT_METHODS.map((method) => (
-              <button
-                key={method.id}
-                onClick={() => setSelectedPayment(method.id)}
-                className={cn(
-                  'flex flex-col items-center justify-center gap-2 py-4 rounded-xl border-2 transition-all duration-200',
-                  selectedPayment === method.id
-                    ? 'border-primary bg-primary/5'
-                    : 'border-outline-variant/30 bg-surface-container-low hover:border-outline-variant'
-                )}
-              >
-                <span
-                  className="material-symbols-outlined text-[24px]"
-                  style={{ color: selectedPayment === method.id ? '#b32008' : method.color }}
-                >
-                  {method.icon}
-                </span>
-                <span className={cn(
-                  'text-sm font-medium',
-                  selectedPayment === method.id ? 'text-primary' : 'text-on-surface'
-                )}>
-                  {method.label}
-                </span>
-              </button>
-            ))}
-          </div>
+          <div id="toss-payment-method" ref={paymentMethodRef} />
+          {!widgetsReady && (
+            <div className="flex items-center justify-center py-8 text-on-surface-variant text-sm">
+              <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin mr-2" />
+              결제 수단 불러오는 중...
+            </div>
+          )}
+        </section>
+
+        {/* Toss 약관 동의 위젯 */}
+        <section className="bg-white rounded-2xl p-5 shadow-soft">
+          <div id="toss-agreement" ref={agreementRef} />
         </section>
 
         {/* Section 6: 쿠폰/적립금 */}
@@ -473,17 +561,27 @@ export default function CheckoutPage() {
             </label>
           ))}
         </section>
+
+        {/* Payment error */}
+        {paymentError && (
+          <section className="bg-error/5 rounded-2xl p-4 border border-error/20">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-error text-[20px]">error</span>
+              <p className="text-sm text-error">{paymentError}</p>
+            </div>
+          </section>
+        )}
       </div>
 
       {/* Fixed bottom bar */}
       <div className="fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-outline-variant/30 shadow-strong">
         <div className="max-w-3xl mx-auto px-4 py-3">
           <button
-            disabled={!agreeOrder || !agreeRefund || isSubmitting}
+            disabled={!agreeOrder || !agreeRefund || isSubmitting || !widgetsReady}
             onClick={handleSubmit}
             className={cn(
               'w-full h-13 py-3.5 rounded-xl font-bold text-base text-white transition-all duration-200 flex items-center justify-center gap-2',
-              agreeOrder && agreeRefund && !isSubmitting
+              agreeOrder && agreeRefund && !isSubmitting && widgetsReady
                 ? 'bg-gradient-to-r from-primary to-primary-container hover:shadow-medium active:scale-[0.98]'
                 : 'bg-outline-variant/60 cursor-not-allowed'
             )}
