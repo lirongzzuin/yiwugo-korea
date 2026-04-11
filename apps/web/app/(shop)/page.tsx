@@ -30,26 +30,48 @@ const CATEGORY_ICON_MAP: Record<string, string> = {
   '玩具': 'toys', '地摊挑货': 'shopping_cart', '美妆': 'spa', '药品': 'medication',
 };
 
-// Fallback Korean promo banners (used when API has no popular products)
+// 서비스 소개 + 이벤트 배너
 // Images: Unsplash (free for commercial use, no attribution required)
-const FALLBACK_BANNERS = [
+const SERVICE_BANNERS = [
   {
-    title: '이우 시장 200만개 상품',
-    subtitle: '중국 최대 도매시장 이우에서 직소싱',
+    icon: 'storefront',
+    tag: '서비스 소개',
+    title: '중국 이우 시장\n200만개 상품 직소싱',
+    subtitle: '세계 최대 도매시장에서 원하는 상품을 찾아보세요',
     gradient: 'from-primary to-primary-container',
     imageUrl: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800&h=450&fit=crop&q=80',
+    href: '/search',
+    cta: '상품 둘러보기',
   },
   {
-    title: '결제 기준 환율 실시간 적용',
-    subtitle: '한국수출입은행 기준 CNY→KRW 자동 환산',
-    gradient: 'from-tertiary to-tertiary-container',
-    imageUrl: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=800&h=450&fit=crop&q=80',
-  },
-  {
-    title: '원스톱 물류 서비스',
-    subtitle: '검수 → 합포장 → 통관 → 국내배송',
-    gradient: 'from-secondary to-secondary-container',
+    icon: 'local_shipping',
+    tag: '물류 서비스',
+    title: '검수부터 국내배송까지\n원스톱 물류',
+    subtitle: '이우 현지 검수 → 합포장 → 한국 통관 → 국내 배송',
+    gradient: 'from-emerald-700 to-emerald-500',
     imageUrl: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=800&h=450&fit=crop&q=80',
+    href: '/guide',
+    cta: '이용 방법 보기',
+  },
+  {
+    icon: 'campaign',
+    tag: '오픈 이벤트',
+    title: '신규 회원 가입 시\n3,000원 적립금 지급',
+    subtitle: '지금 가입하고 첫 주문에 바로 사용하세요',
+    gradient: 'from-amber-600 to-orange-500',
+    imageUrl: 'https://images.unsplash.com/photo-1607082349566-187342175e2f?w=800&h=450&fit=crop&q=80',
+    href: '/register',
+    cta: '회원가입 하기',
+  },
+  {
+    icon: 'currency_exchange',
+    tag: '실시간 환율',
+    title: '결제 기준 환율\n실시간 자동 적용',
+    subtitle: '한국수출입은행 매매기준율 기반, 관부가세 자동 계산',
+    gradient: 'from-blue-700 to-indigo-500',
+    imageUrl: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=800&h=450&fit=crop&q=80',
+    href: '/search',
+    cta: '가격 확인하기',
   },
 ];
 
@@ -66,50 +88,14 @@ const POPULAR_TABS = ['전체', '조명', '전자', '주방', '뷰티'] as const
 
 function PromoBannerCarousel() {
   const [current, setCurrent] = useState(0);
-  const [rawProducts, setRawProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-  const translated = useTranslatedProducts(rawProducts);
-  // Use translated names when ready, otherwise show raw products
-  const products = translated.length > 0 ? translated : rawProducts;
-
-  useEffect(() => {
-    fetch('/api/products/popular?pageSize=5')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data?.data?.length > 0) {
-          setRawProducts(data.data.slice(0, 3));
-        } else {
-          return fetch('/api/products/search?pageSize=5')
-            .then((r) => r.json())
-            .then((d) => {
-              if (d?.data?.length > 0) setRawProducts(d.data.slice(0, 3));
-            });
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
-
-  const bannerCount = rawProducts.length > 0 ? rawProducts.length : FALLBACK_BANNERS.length;
+  const bannerCount = SERVICE_BANNERS.length;
 
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrent((c) => (c + 1) % bannerCount);
-    }, 4000);
+    }, 5000);
     return () => clearInterval(timer);
   }, [bannerCount]);
-
-  if (loading) {
-    return <div className="aspect-[16/9] bg-surface-container rounded-2xl animate-pulse" />;
-  }
-
-  const gradients = [
-    'from-primary to-primary-container',
-    'from-tertiary to-tertiary-container',
-    'from-secondary to-secondary-container',
-  ];
-
-  const hasBannerProducts = rawProducts.length > 0;
 
   return (
     <div className="relative">
@@ -118,49 +104,53 @@ function PromoBannerCarousel() {
           className="flex transition-transform duration-500 ease-out"
           style={{ transform: `translateX(-${current * 100}%)` }}
         >
-          {hasBannerProducts
-            ? products.map((product, idx) => (
-                <Link key={product.id} href={`/product/${product.id}`} className="w-full flex-shrink-0">
-                  <div className={cn('aspect-[16/9] bg-gradient-to-br rounded-2xl p-6 md:p-10 flex flex-col justify-end relative overflow-hidden', gradients[idx % 3])}>
-                    {product.imageUrl && (
-                      <div className="absolute inset-0 opacity-30">
-                        <img src={product.imageUrl} alt="" className="w-full h-full object-cover" />
-                      </div>
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-                    <div className="relative z-10 text-white">
-                      <h2 className="text-xl md:text-3xl font-heading font-black mb-1 line-clamp-1">{product.name}</h2>
-                      <p className="text-sm md:text-base text-white/80">
-                        {product.priceKRW > 0 ? `${product.priceKRW.toLocaleString()}원 ~ 인기 도매 상품` : '이우 인기 도매 상품'}
-                      </p>
-                    </div>
-                  </div>
-                </Link>
-              ))
-            : FALLBACK_BANNERS.map((banner, idx) => (
-                <Link key={idx} href="/search" className="w-full flex-shrink-0">
-                  <div className={cn('aspect-[16/9] bg-gradient-to-br rounded-2xl p-6 md:p-10 flex flex-col justify-end relative overflow-hidden', banner.gradient)}>
-                    {banner.imageUrl && (
-                      <div className="absolute inset-0 opacity-25">
-                        <img src={banner.imageUrl} alt="" className="w-full h-full object-cover" loading={idx === 0 ? 'eager' : 'lazy'} />
-                      </div>
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-                    <div className="relative z-10 text-white">
-                      <h2 className="text-xl md:text-3xl font-heading font-black mb-1">{banner.title}</h2>
-                      <p className="text-sm md:text-base text-white/80">{banner.subtitle}</p>
-                    </div>
-                  </div>
-                </Link>
-              ))}
+          {SERVICE_BANNERS.map((banner, idx) => (
+            <Link key={idx} href={banner.href} className="w-full flex-shrink-0">
+              <div className={cn(
+                'aspect-[2/1] md:aspect-[16/7] bg-gradient-to-br rounded-2xl p-5 md:p-10 flex flex-col justify-between relative overflow-hidden',
+                banner.gradient
+              )}>
+                {/* Background image */}
+                <div className="absolute inset-0 opacity-15">
+                  <img src={banner.imageUrl} alt="" className="w-full h-full object-cover" loading={idx === 0 ? 'eager' : 'lazy'} />
+                </div>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+
+                {/* Tag */}
+                <div className="relative z-10">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/20 backdrop-blur-sm text-white text-[10px] md:text-xs font-semibold">
+                    <span className="material-symbols-outlined text-[14px] md:text-[16px]">{banner.icon}</span>
+                    {banner.tag}
+                  </span>
+                </div>
+
+                {/* Content */}
+                <div className="relative z-10 text-white">
+                  <h2 className="text-lg md:text-2xl font-heading font-black mb-1 leading-tight whitespace-pre-line">
+                    {banner.title}
+                  </h2>
+                  <p className="text-xs md:text-sm text-white/80 mb-3">{banner.subtitle}</p>
+                  <span className="inline-flex items-center gap-1 px-4 py-2 rounded-full bg-white text-on-surface text-xs md:text-sm font-bold hover:bg-white/90 transition-colors">
+                    {banner.cta}
+                    <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                  </span>
+                </div>
+              </div>
+            </Link>
+          ))}
         </div>
       </div>
+
+      {/* Indicator dots */}
       <div className="flex justify-center gap-1.5 mt-3">
-        {Array.from({ length: bannerCount }).map((_, i) => (
+        {SERVICE_BANNERS.map((_, i) => (
           <button
             key={i}
             onClick={() => setCurrent(i)}
-            className={cn('h-1.5 rounded-full transition-all', i === current ? 'w-6 bg-primary' : 'w-1.5 bg-stone-300')}
+            className={cn(
+              'h-1.5 rounded-full transition-all duration-300',
+              i === current ? 'w-6 bg-primary' : 'w-1.5 bg-stone-300'
+            )}
           />
         ))}
       </div>
