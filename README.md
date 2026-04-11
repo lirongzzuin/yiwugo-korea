@@ -397,7 +397,7 @@ translation_cache, audit_logs, banners, notices, faqs
 
 ```bash
 # 저장소 클론
-git clone https://github.com/younggyun12/yiwugo-korea.git
+git clone https://github.com/lirongzzuin/yiwugo-korea.git
 cd yiwugo-korea
 
 # 의존성 설치
@@ -574,7 +574,7 @@ yiwugo-korea/
 
 ## 11. 문의
 
-- GitHub: [younggyun12](https://github.com/younggyun12)
+- GitHub: [lirongzzuin](https://github.com/lirongzzuin)
 - Email: 문의 시 이슈를 생성해 주세요
 
 ---
