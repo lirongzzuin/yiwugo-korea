@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import ProductGrid from '@/components/product/ProductGrid';
 import type { Product } from '@/components/product/ProductCard';
@@ -132,7 +133,17 @@ function SearchPageContent() {
     if (sort === 'sales') result.sort((a, b) => (b.salesCount || 0) - (a.salesCount || 0));
 
     return result;
-  }, [products, priceRange, moqRange, sort]);
+    // Certified shop filter (shops with high sales)
+    if (certifiedOnly) {
+      result = result.filter((p) => (p.salesCount || 0) >= 100);
+    }
+
+    // Free shipping filter (low-price items often have free shipping threshold)
+    if (freeShipping) {
+      result = result.filter((p) => p.priceKRW >= 10000);
+    }
+
+  }, [products, priceRange, moqRange, sort, certifiedOnly, freeShipping]);
 
   const displayedProducts = filteredProducts.slice(0, displayCount);
   const hasMore = displayCount < filteredProducts.length;
@@ -301,9 +312,40 @@ function SearchPageContent() {
               ))}
             </div>
           ) : displayedProducts.length === 0 ? (
-            <div className="text-center py-20">
-              <span className="material-symbols-outlined text-[48px] text-on-surface-variant/40">search_off</span>
-              <p className="text-on-surface-variant mt-4">검색 결과가 없습니다.</p>
+            <div className="text-center py-16">
+              <span className="material-symbols-outlined text-[56px] text-on-surface-variant/30">search_off</span>
+              <p className="text-on-surface font-medium mt-4">
+                {query ? `'${query}'에 대한 검색 결과가 없습니다` : '조건에 맞는 상품이 없습니다'}
+              </p>
+              <p className="text-sm text-on-surface-variant mt-1">
+                {priceRange !== 'all' || moqRange !== 'all'
+                  ? '필터 조건을 변경해 보세요'
+                  : '다른 키워드로 검색해 보세요'}
+              </p>
+              {(priceRange !== 'all' || moqRange !== 'all') && (
+                <button
+                  onClick={() => { setPriceRange('all'); setMoqRange('all'); setCertifiedOnly(false); setFreeShipping(false); }}
+                  className="mt-4 px-5 py-2 rounded-full bg-primary text-white text-sm font-medium hover:bg-primary-container transition-colors"
+                >
+                  필터 초기화
+                </button>
+              )}
+              {query && (
+                <div className="mt-6">
+                  <p className="text-xs text-on-surface-variant mb-3">이런 키워드는 어떠세요?</p>
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    {['USB', '이어폰', 'LED', '케이스', '충전기', '수납'].map((kw) => (
+                      <Link
+                        key={kw}
+                        href={`/search?q=${kw}`}
+                        className="px-3 py-1.5 rounded-full bg-surface-container text-xs font-medium text-on-surface-variant hover:bg-primary/10 hover:text-primary transition-colors"
+                      >
+                        {kw}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <ProductGrid products={displayedProducts} columns={2} />

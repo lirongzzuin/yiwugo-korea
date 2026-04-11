@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/cn';
 import { useCartStore } from '@/stores/cart-store';
+import { useWishlistStore } from '@/stores/wishlist-store';
 
 interface NavItem {
   icon: string;
@@ -12,7 +13,7 @@ interface NavItem {
   label: string;
   href: string;
   match: (pathname: string) => boolean;
-  showBadge?: boolean;
+  badgeType?: 'cart' | 'wishlist';
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -38,25 +39,27 @@ const NAV_ITEMS: NavItem[] = [
     match: (p) => p.startsWith('/search'),
   },
   {
+    icon: 'favorite',
+    filledIcon: 'favorite',
+    label: '찜',
+    href: '/wishlist',
+    match: (p) => p.startsWith('/wishlist'),
+    badgeType: 'wishlist',
+  },
+  {
     icon: 'shopping_cart',
     filledIcon: 'shopping_cart',
     label: '장바구니',
     href: '/cart',
     match: (p) => p.startsWith('/cart'),
-    showBadge: true,
-  },
-  {
-    icon: 'person',
-    filledIcon: 'person',
-    label: '마이',
-    href: '/profile',
-    match: (p) => p.startsWith('/profile'),
+    badgeType: 'cart',
   },
 ];
 
 export default function BottomNav() {
   const pathname = usePathname();
   const cartTotal = useCartStore((s) => s.totalItems());
+  const wishlistCount = useWishlistStore((s) => s.items.length);
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
@@ -90,9 +93,14 @@ export default function BottomNav() {
                 >
                   {isActive ? item.filledIcon : item.icon}
                 </span>
-                {item.showBadge && mounted && cartTotal > 0 && (
+                {item.badgeType === 'cart' && mounted && cartTotal > 0 && (
                   <span className="absolute -top-1 -right-1.5 min-w-[16px] h-[16px] flex items-center justify-center rounded-full bg-primary text-white text-[9px] font-bold px-0.5">
                     {cartTotal > 99 ? '99+' : cartTotal}
+                  </span>
+                )}
+                {item.badgeType === 'wishlist' && mounted && wishlistCount > 0 && (
+                  <span className="absolute -top-1 -right-1.5 min-w-[16px] h-[16px] flex items-center justify-center rounded-full bg-red-500 text-white text-[9px] font-bold px-0.5">
+                    {wishlistCount > 99 ? '99+' : wishlistCount}
                   </span>
                 )}
               </div>

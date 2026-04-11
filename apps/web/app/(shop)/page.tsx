@@ -5,6 +5,7 @@ import Link from 'next/link';
 import ExchangeRateBanner from '@/components/common/ExchangeRateBanner';
 import ProductCard, { type Product } from '@/components/product/ProductCard';
 import ProductGrid from '@/components/product/ProductGrid';
+import RecommendedProducts from '@/components/product/RecommendedProducts';
 import { useTranslatedProducts } from '@/hooks/useTranslation';
 import { cn } from '@/lib/cn';
 
@@ -359,20 +360,26 @@ function PopularPicksSection() {
 }
 
 function TrustBanner() {
+  const features = [
+    { icon: 'verified', label: '정품 보장', desc: '이우 현지 직소싱', color: 'text-blue-600 bg-blue-50' },
+    { icon: 'local_shipping', label: '원스톱 물류', desc: '검수→통관→배송', color: 'text-emerald-600 bg-emerald-50' },
+    { icon: 'currency_exchange', label: '실시간 환율', desc: 'CNY→KRW 자동', color: 'text-amber-600 bg-amber-50' },
+    { icon: 'support_agent', label: '한국어 지원', desc: '전담 고객센터', color: 'text-purple-600 bg-purple-50' },
+  ];
+
   return (
-    <section className="bg-primary-container rounded-2xl p-5 md:p-8 text-white">
-      <div className="flex items-start gap-4">
-        <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
-          <span className="material-symbols-outlined text-[28px]">local_shipping</span>
+    <section className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
+      {features.map((f) => (
+        <div key={f.label} className={cn('flex items-center gap-3 p-3.5 rounded-xl', f.color.split(' ')[1])}>
+          <div className={cn('w-10 h-10 rounded-full flex items-center justify-center shrink-0', f.color.split(' ')[1])}>
+            <span className={cn('material-symbols-outlined text-[22px]', f.color.split(' ')[0])}>{f.icon}</span>
+          </div>
+          <div>
+            <p className={cn('text-xs font-bold', f.color.split(' ')[0])}>{f.label}</p>
+            <p className="text-[10px] text-on-surface-variant">{f.desc}</p>
+          </div>
         </div>
-        <div>
-          <h3 className="font-heading font-bold text-base md:text-lg mb-1">전문 물류 서비스</h3>
-          <p className="text-sm text-white/80 leading-relaxed">
-            이우 현지 검수 &rarr; 합포장 &rarr; 한국 통관 &rarr; 국내 배송까지.
-            전 과정 추적 가능한 원스톱 물류 시스템으로 안전하게 받아보세요.
-          </p>
-        </div>
-      </div>
+      ))}
     </section>
   );
 }
@@ -385,9 +392,15 @@ export default function HomePage() {
       <ExchangeRateBanner />
       <div className="max-w-7xl mx-auto px-4 lg:px-8 py-5 space-y-8">
         <PromoBannerCarousel />
+        <TrustBanner />
         <CategoryGrid />
         <NewArrivalsSection />
-        <TrustBanner />
+        {/* Personalized recommendations */}
+        <RecommendedProducts
+          type="personalized"
+          limit={12}
+          title="맞춤 추천 상품"
+        />
         <PopularPicksSection />
       </div>
     </>
