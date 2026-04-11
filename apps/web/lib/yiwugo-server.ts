@@ -62,15 +62,22 @@ async function apiGet(path: string, params: Record<string, string> = {}): Promis
 }
 
 /**
- * Normalize image URL: convert relative paths to absolute CDN URLs
+ * Normalize image URL: route through image proxy to bypass Yiwugo's hotlink protection.
+ * Yiwugo CDN returns 403 when Referer is from external domains.
  */
 export function normalizeImageUrl(url: string): string {
   if (!url) return '';
-  // Convert http to https
-  if (url.startsWith('http://')) return url.replace('http://', 'https://');
-  if (url.startsWith('https://')) return url;
-  if (url.startsWith('//')) return 'https:' + url;
-  return 'https://img1.yiwugo.com/' + url;
+  let absoluteUrl = url;
+  if (url.startsWith('//')) {
+    absoluteUrl = 'https:' + url;
+  } else if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    absoluteUrl = 'https://img1.yiwugo.com/' + url;
+  }
+  // Route yiwugo domain images through proxy to bypass referrer blocking
+  if (absoluteUrl.includes('yiwugo.com') || absoluteUrl.includes('alicdn.com')) {
+    return '/api/img?url=' + encodeURIComponent(absoluteUrl);
+  }
+  return absoluteUrl;
 }
 
 // ─── 商铺 (Shop) APIs ───────────────────────────────────────

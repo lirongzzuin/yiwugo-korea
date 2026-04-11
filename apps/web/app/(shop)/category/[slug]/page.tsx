@@ -1,138 +1,71 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { cn } from '@/lib/cn';
 import ProductGrid from '@/components/product/ProductGrid';
 import type { Product } from '@/components/product/ProductCard';
 
-// Chinese category name → Korean mapping
+// Chinese category name → Korean mapping (matches actual API response)
 const CATEGORY_NAME_MAP: Record<string, string> = {
-  '饰品': '액세서리',
-  '工艺品': '공예품',
-  '五金': '철물',
-  '箱包': '가방',
-  '服装服饰': '패션의류',
-  '日用百货': '생활잡화',
-  '针纺织品': '섬유직물',
-  '鞋类': '신발',
-  '玩具': '완구',
-  '文体': '문구/체육',
-  '电子电器': '전자/가전',
-  '化妆品': '화장품',
-  '食品': '식품',
-  '汽摩配件': '자동차부품',
-  '母婴用品': '유아용품',
-  '宠物用品': '반려동물',
-  '运动户外': '스포츠/아웃도어',
-  '家居家装': '홈인테리어',
-  '办公文教': '사무/교육',
-  '护肤品': '스킨케어',
+  '辅料': '부자재', '配饰': '패션잡화', '医疗器械': '의료기기', '五金': '철물/공구',
+  '机械': '기계', '鞋靴': '신발', '家电': '가전', '数码': '디지털',
+  '汽车用品': '자동차용품', '百货': '생활잡화', '母婴': '유아/출산', '工艺品': '공예품',
+  '个护': '개인위생', '帽子围巾': '모자/스카프', '节庆礼品': '축제/선물', '箱包': '가방',
+  '宠物用品': '반려동물', '体育用品': '스포츠', '办公文教': '사무/문구', '服饰': '의류',
+  '内衣': '속옷/언더웨어', '袜类': '양말', '厨卫': '주방/욕실', '饰品': '액세서리',
+  '玩具': '완구', '地摊挑货': '시장용품', '美妆': '뷰티', '药品': '의약품',
 };
 
-// Material icon mapping for categories
 const CATEGORY_ICON_MAP: Record<string, string> = {
-  '饰品': 'diamond',
-  '工艺品': 'palette',
-  '五金': 'build',
-  '箱包': 'luggage',
-  '服装服饰': 'checkroom',
-  '日用百货': 'kitchen',
-  '针纺织品': 'texture',
-  '鞋类': 'steps',
-  '玩具': 'toys',
-  '文体': 'edit',
-  '电子电器': 'devices',
-  '化妆品': 'spa',
-  '食品': 'restaurant',
-  '汽摩配件': 'directions_car',
-  '母婴用品': 'child_care',
-  '宠物用品': 'pets',
-  '运动户外': 'sports_soccer',
-  '家居家装': 'local_florist',
-  '办公文教': 'school',
-  '护肤品': 'face_retouching_natural',
-};
-
-// Slug → Chinese search query mapping (for legacy slug-based URLs)
-const SLUG_QUERY_MAP: Record<string, string> = {
-  living: '生活用品',
-  fashion: '服装',
-  digital: '电子产品',
-  beauty: '美容',
-  stationery: '文具',
-  sports: '运动',
-  pets: '宠物',
-  tools: '工具',
-  interior: '家居装饰',
-  food: '食品',
-  auto: '汽车配件',
-  kids: '儿童',
-};
-
-const SLUG_LABEL_MAP: Record<string, string> = {
-  living: '생활/주방',
-  fashion: '패션/의류',
-  digital: '전자/디지털',
-  beauty: '뷰티/건강',
-  stationery: '문구/완구',
-  sports: '스포츠',
-  pets: '반려동물',
-  tools: '공구/산업',
-  interior: '인테리어',
-  food: '식품/음료',
-  auto: '자동차',
-  kids: '유아동',
+  '辅料': 'content_cut', '配饰': 'watch', '医疗器械': 'medical_services', '五金': 'build',
+  '机械': 'precision_manufacturing', '鞋靴': 'steps', '家电': 'kitchen', '数码': 'smartphone',
+  '汽车用品': 'directions_car', '百货': 'storefront', '母婴': 'child_care', '工艺品': 'palette',
+  '个护': 'face_retouching_natural', '帽子围巾': 'checkroom', '节庆礼品': 'celebration', '箱包': 'luggage',
+  '宠物用品': 'pets', '体育用品': 'sports_soccer', '办公文教': 'school', '服饰': 'checkroom',
+  '内衣': 'dry_cleaning', '袜类': 'footprint', '厨卫': 'countertops', '饰品': 'diamond',
+  '玩具': 'toys', '地摊挑货': 'shopping_cart', '美妆': 'spa', '药品': 'medication',
 };
 
 interface ApiCategory {
   id: number;
   type: string;
   entype: string;
-  img?: string;
-  rank?: string;
 }
 
 export default function CategoryPage() {
   const params = useParams();
-  const slug = params.slug as string;
+  const slug = decodeURIComponent(params.slug as string);
 
   const [categories, setCategories] = useState<ApiCategory[]>([]);
-  const [activeCategory, setActiveCategory] = useState<string>(slug);
-  const [activeCategoryId, setActiveCategoryId] = useState<number | null>(null);
+  const [activeType, setActiveType] = useState<string>(slug);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [catsLoading, setCatsLoading] = useState(true);
 
-  // Fetch API categories on mount
+  // Fetch API categories
   useEffect(() => {
     fetch('/api/categories')
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) {
           setCategories(data);
+          // If slug matches a Chinese type name, use it; otherwise find closest match
+          const match = data.find((c: ApiCategory) => c.type === slug);
+          if (match) {
+            setActiveType(match.type);
+          }
         }
       })
       .catch(() => {})
       .finally(() => setCatsLoading(false));
-  }, []);
+  }, [slug]);
 
   // Fetch products when active category changes
   useEffect(() => {
     setLoading(true);
-
-    let url: string;
-    if (activeCategoryId) {
-      // Use category ID for API categories
-      url = `/api/products/search?q=&categoryId=${activeCategoryId}&pageSize=20`;
-    } else {
-      // Use slug-based Chinese query for legacy slugs
-      const query = SLUG_QUERY_MAP[activeCategory] || activeCategory;
-      url = `/api/products/search?q=${encodeURIComponent(query)}&pageSize=20`;
-    }
-
-    fetch(url)
+    const query = activeType;
+    fetch(`/api/products/search?q=${encodeURIComponent(query)}&pageSize=24`)
       .then((res) => res.json())
       .then((data) => {
         if (data?.data && Array.isArray(data.data)) {
@@ -141,26 +74,9 @@ export default function CategoryPage() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [activeCategory, activeCategoryId]);
+  }, [activeType]);
 
-  // Build sidebar items: use API categories if loaded, fallback to slug-based
-  const sidebarItems = categories.length > 0
-    ? categories.map((cat) => ({
-        key: String(cat.id),
-        label: CATEGORY_NAME_MAP[cat.type] || cat.type,
-        icon: CATEGORY_ICON_MAP[cat.type] || 'category',
-        categoryId: cat.id,
-      }))
-    : Object.entries(SLUG_LABEL_MAP).map(([s, label]) => ({
-        key: s,
-        label,
-        icon: 'category',
-        categoryId: null as number | null,
-      }));
-
-  const currentLabel = activeCategoryId
-    ? sidebarItems.find((s) => s.categoryId === activeCategoryId)?.label || '카테고리'
-    : SLUG_LABEL_MAP[activeCategory] || '카테고리';
+  const currentLabel = CATEGORY_NAME_MAP[activeType] || activeType;
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -169,24 +85,21 @@ export default function CategoryPage() {
         <aside className="w-20 md:w-24 flex-shrink-0 bg-surface-container-lowest border-r border-outline-variant/20 overflow-y-auto">
           <nav className="py-2">
             {catsLoading ? (
-              Array.from({ length: 8 }).map((_, i) => (
+              Array.from({ length: 10 }).map((_, i) => (
                 <div key={i} className="w-full flex flex-col items-center gap-1 py-3 px-1">
                   <div className="w-6 h-6 bg-surface-container rounded animate-pulse" />
                   <div className="w-10 h-3 bg-surface-container rounded animate-pulse mt-1" />
                 </div>
               ))
             ) : (
-              sidebarItems.map((item) => {
-                const isActive = item.categoryId
-                  ? activeCategoryId === item.categoryId
-                  : activeCategory === item.key;
+              categories.map((cat) => {
+                const isActive = activeType === cat.type;
+                const label = CATEGORY_NAME_MAP[cat.type] || cat.type;
+                const icon = CATEGORY_ICON_MAP[cat.type] || 'category';
                 return (
                   <button
-                    key={item.key}
-                    onClick={() => {
-                      setActiveCategory(item.key);
-                      setActiveCategoryId(item.categoryId);
-                    }}
+                    key={cat.id}
+                    onClick={() => setActiveType(cat.type)}
                     className={cn(
                       'w-full flex flex-col items-center gap-1 py-3 px-1 text-center transition-colors relative',
                       isActive
@@ -202,16 +115,12 @@ export default function CategoryPage() {
                         'material-symbols-outlined text-[22px]',
                         isActive ? 'text-primary' : ''
                       )}
-                      style={
-                        isActive
-                          ? { fontVariationSettings: "'FILL' 1" }
-                          : undefined
-                      }
+                      style={isActive ? { fontVariationSettings: "'FILL' 1" } : undefined}
                     >
-                      {item.icon}
+                      {icon}
                     </span>
                     <span className="text-[10px] md:text-[11px] font-medium leading-tight">
-                      {item.label}
+                      {label}
                     </span>
                   </button>
                 );
@@ -222,7 +131,6 @@ export default function CategoryPage() {
 
         {/* Main content */}
         <main className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
-          {/* Category header */}
           <div>
             <h1 className="text-lg font-heading font-bold text-on-surface mb-1">
               {currentLabel}
@@ -230,26 +138,24 @@ export default function CategoryPage() {
           </div>
 
           {/* Promotional banner */}
-          <section>
-            <div className="bg-gradient-to-r from-secondary to-secondary-container rounded-xl p-4 md:p-5 text-white">
-              <div className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-[32px]">campaign</span>
-                <div>
-                  <h3 className="font-heading font-bold text-sm md:text-base">
-                    {currentLabel} 할인 기획전
-                  </h3>
-                  <p className="text-xs text-white/80 mt-0.5">
-                    인기 상품 최대 40% 할인 진행 중
-                  </p>
-                </div>
+          <div className="bg-gradient-to-r from-secondary to-secondary-container rounded-xl p-4 md:p-5 text-white">
+            <div className="flex items-center gap-3">
+              <span className="material-symbols-outlined text-[32px]">campaign</span>
+              <div>
+                <h3 className="font-heading font-bold text-sm md:text-base">
+                  {currentLabel} 인기 상품
+                </h3>
+                <p className="text-xs text-white/80 mt-0.5">
+                  이우 시장 도매가로 만나보세요
+                </p>
               </div>
             </div>
-          </section>
+          </div>
 
-          {/* Popular products */}
+          {/* Products */}
           <section>
             <h2 className="text-base font-heading font-bold text-on-surface mb-3">
-              인기 상품
+              상품 목록
             </h2>
             {loading ? (
               <div className="grid grid-cols-2 gap-3">
@@ -262,7 +168,7 @@ export default function CategoryPage() {
             ) : (
               <div className="text-center py-10">
                 <span className="material-symbols-outlined text-[48px] text-on-surface-variant/30">inventory_2</span>
-                <p className="text-on-surface-variant mt-3 text-sm">상품을 불러오는 중입니다...</p>
+                <p className="text-on-surface-variant mt-3 text-sm">해당 카테고리에 상품이 없습니다.</p>
               </div>
             )}
           </section>

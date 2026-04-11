@@ -2,58 +2,73 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import ExchangeRateBanner from '@/components/common/ExchangeRateBanner';
 import ProductCard, { type Product } from '@/components/product/ProductCard';
 import ProductGrid from '@/components/product/ProductGrid';
 import { cn } from '@/lib/cn';
 
-// Chinese category name → Korean mapping
+// Chinese category name → Korean mapping (matches actual API response)
 const CATEGORY_NAME_MAP: Record<string, string> = {
-  '饰品': '액세서리',
+  '辅料': '부자재',
+  '配饰': '패션잡화',
+  '医疗器械': '의료기기',
+  '五金': '철물/공구',
+  '机械': '기계',
+  '鞋靴': '신발',
+  '家电': '가전',
+  '数码': '디지털',
+  '汽车用品': '자동차용품',
+  '百货': '생활잡화',
+  '母婴': '유아/출산',
   '工艺品': '공예품',
-  '五金': '철물',
+  '个护': '개인위생',
+  '帽子围巾': '모자/스카프',
+  '节庆礼品': '축제/선물',
   '箱包': '가방',
-  '服装服饰': '패션의류',
-  '日用百货': '생활잡화',
-  '针纺织品': '섬유직물',
-  '鞋类': '신발',
-  '玩具': '완구',
-  '文体': '문구/체육',
-  '电子电器': '전자/가전',
-  '化妆品': '화장품',
-  '食品': '식품',
-  '汽摩配件': '자동차부품',
-  '母婴用品': '유아용품',
   '宠物用品': '반려동물',
-  '运动户外': '스포츠/아웃도어',
-  '家居家装': '홈인테리어',
-  '办公文教': '사무/교육',
-  '护肤品': '스킨케어',
+  '体育用品': '스포츠',
+  '办公文教': '사무/문구',
+  '服饰': '의류',
+  '内衣': '속옷/언더웨어',
+  '袜类': '양말',
+  '厨卫': '주방/욕실',
+  '饰品': '액세서리',
+  '玩具': '완구',
+  '地摊挑货': '시장용품',
+  '美妆': '뷰티',
+  '药品': '의약품',
 };
 
-// Material icon mapping for categories
+// Material icon mapping for categories (matches actual API response)
 const CATEGORY_ICON_MAP: Record<string, string> = {
-  '饰品': 'diamond',
-  '工艺品': 'palette',
+  '辅料': 'content_cut',
+  '配饰': 'watch',
+  '医疗器械': 'medical_services',
   '五金': 'build',
+  '机械': 'precision_manufacturing',
+  '鞋靴': 'steps',
+  '家电': 'kitchen',
+  '数码': 'smartphone',
+  '汽车用品': 'directions_car',
+  '百货': 'storefront',
+  '母婴': 'child_care',
+  '工艺品': 'palette',
+  '个护': 'face_retouching_natural',
+  '帽子围巾': 'checkroom',
+  '节庆礼品': 'celebration',
   '箱包': 'luggage',
-  '服装服饰': 'checkroom',
-  '日用百货': 'kitchen',
-  '针纺织品': 'texture',
-  '鞋类': 'steps',
-  '玩具': 'toys',
-  '文体': 'edit',
-  '电子电器': 'devices',
-  '化妆品': 'spa',
-  '食品': 'restaurant',
-  '汽摩配件': 'directions_car',
-  '母婴用品': 'child_care',
   '宠物用品': 'pets',
-  '运动户外': 'sports_soccer',
-  '家居家装': 'local_florist',
+  '体育用品': 'sports_soccer',
   '办公文教': 'school',
-  '护肤品': 'face_retouching_natural',
+  '服饰': 'checkroom',
+  '内衣': 'dry_cleaning',
+  '袜类': 'footprint',
+  '厨卫': 'countertops',
+  '饰品': 'diamond',
+  '玩具': 'toys',
+  '地摊挑货': 'shopping_cart',
+  '美妆': 'spa',
+  '药品': 'medication',
 };
 
 interface ApiCategory {
@@ -138,12 +153,10 @@ function PromoBannerCarousel() {
               >
                 {product.imageUrl && (
                   <div className="absolute inset-0 opacity-30">
-                    <Image
+                    <img
                       src={product.imageUrl}
                       alt={product.name}
-                      fill
-                      className="object-cover"
-                      unoptimized
+                      className="w-full h-full object-cover"
                     />
                   </div>
                 )}
