@@ -164,14 +164,14 @@ export default function ProductDetailPage() {
 
   return (
     <div className="pb-20">
-      {/* Image Gallery */}
-      <div className="relative bg-surface-container">
-        <div className="aspect-square overflow-hidden">
+      {/* Image Gallery - constrained on desktop */}
+      <div className="relative bg-surface-container max-w-2xl mx-auto">
+        <div className="aspect-square max-h-[500px] overflow-hidden">
           {images[currentImage] ? (
             <img
               src={images[currentImage]}
               alt={product.title}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain"
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-surface-container">

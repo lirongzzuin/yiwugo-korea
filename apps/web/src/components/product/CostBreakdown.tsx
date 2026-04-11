@@ -11,15 +11,16 @@ interface CostBreakdownProps {
   shippingMethod?: 'AIR' | 'SEA';
 }
 
-// Constants
-const AIR_RATE_PER_KG = 5500;
-const SEA_RATE_PER_KG = 2000;
-const BASE_SHIPPING_FEE = 3000;
-const COMMISSION_RATE = 0.05;
-const DUTY_FREE_LIMIT_USD = 150;
-const CUSTOMS_DUTY_RATE = 0.08;
-const VAT_RATE = 0.10;
-const USD_TO_KRW = 1380;
+// Shipping cost constants (based on 2025-2026 China→Korea logistics market rates)
+// Source: 배대지 업체 평균 시세 (123go, 직싸, 포스트팀 등)
+const AIR_RATE_PER_KG = 3500;   // 항공특송: 약 3,000~4,000원/kg
+const SEA_RATE_PER_KG = 1000;   // 해운: 약 800~1,500원/kg
+const BASE_SHIPPING_FEE = 3000; // 기본 취급수수료
+const COMMISSION_RATE = 0.05;   // 플랫폼 수수료 5%
+const DUTY_FREE_LIMIT_USD = 150; // 목록통관 면세 한도 US$150
+const CUSTOMS_DUTY_RATE = 0.08; // 관세율 8% (일반 공산품 기준)
+const VAT_RATE = 0.10;          // 부가세 10%
+const USD_TO_KRW = 1380;        // USD 환율 (근사값)
 
 const TOOLTIP_TEXTS: Record<string, string> = {
   product: '중국 위안화(CNY) 가격에 실시간 환율을 적용한 원화 환산 금액입니다.',
