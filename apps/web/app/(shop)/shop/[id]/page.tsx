@@ -115,6 +115,7 @@ export default function ShopDetailPage() {
       <div className="flex flex-col items-center justify-center py-20">
         <span className="material-symbols-outlined text-[48px] text-on-surface-variant/40">store</span>
         <p className="text-on-surface-variant mt-4">상점을 찾을 수 없습니다.</p>
+        <a href="/" className="mt-4 text-primary text-sm font-medium">홈으로 돌아가기</a>
       </div>
     );
   }

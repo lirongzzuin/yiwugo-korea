@@ -2,112 +2,113 @@
 
 import { useState, useEffect, useRef } from 'react';
 
-// Global client-side translation cache (persists across component lifecycles)
 const clientCache = new Map<string, string>();
 
-/**
- * Check if text contains Chinese characters
- */
 function hasChinese(text: string): boolean {
   return /[\u4e00-\u9fff]/.test(text);
 }
 
 /**
- * Hook to translate an array of product objects.
- * Returns products with translated `name` field.
- * Shows original text immediately, then swaps to Korean when translation completes.
+ * Hook to translate product names from Chinese to Korean.
+ * Shows original immediately, then updates to Korean asynchronously.
  */
 export function useTranslatedProducts<T extends { name: string }>(products: T[]): T[] {
-  const [translated, setTranslated] = useState<T[]>(products);
-  const lastKey = useRef('');
+  const [translated, setTranslated] = useState<T[]>([]);
+  const abortRef = useRef<AbortController | null>(null);
+  const productsRef = useRef(products);
 
   useEffect(() => {
+    productsRef.current = products;
+
     if (!products || products.length === 0) {
-      return; // Don't reset to empty — keep previous state
+      setTranslated([]);
+      return;
     }
 
-    // Create a stable key to avoid duplicate requests
-    const key = products.map((p) => p.name).join('|').substring(0, 200);
-    if (key === lastKey.current) return;
-    lastKey.current = key;
+    // Apply cached translations synchronously first, show original for uncached
+    const initial = products.map((p) => ({
+      ...p,
+      name: clientCache.get(p.name) || p.name,
+    }));
+    setTranslated(initial);
 
-    // First, apply cached translations immediately (synchronous)
-    const withCache = products.map((p) => {
-      if (clientCache.has(p.name)) {
-        return { ...p, name: clientCache.get(p.name)! };
-      }
-      return p;
-    });
-    setTranslated(withCache);
-
-    // Find texts that need translation (have Chinese and not cached)
-    const needsTranslation = products
-      .map((p) => p.name)
-      .filter((name) => hasChinese(name) && !clientCache.has(name));
+    // Find texts that need translation
+    const needsTranslation = [...new Set(
+      products.map((p) => p.name).filter((n) => hasChinese(n) && !clientCache.has(n))
+    )];
 
     if (needsTranslation.length === 0) return;
 
-    // Deduplicate
-    const uniqueTexts = [...new Set(needsTranslation)];
+    // Abort previous request
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
 
-    // Batch translate via API
     fetch('/api/translate/batch', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ texts: uniqueTexts }),
+      body: JSON.stringify({ texts: needsTranslation }),
+      signal: controller.signal,
     })
       .then((res) => res.json())
       .then((data) => {
+        if (controller.signal.aborted) return;
         const translations: string[] = data.translations || [];
-
-        // Update cache
-        uniqueTexts.forEach((text, i) => {
-          if (translations[i]) {
-            clientCache.set(text, translations[i]);
-          }
+        needsTranslation.forEach((text, i) => {
+          if (translations[i]) clientCache.set(text, translations[i]);
         });
-
-        // Apply translations to products
-        setTranslated(
-          products.map((p) => ({
-            ...p,
-            name: clientCache.get(p.name) || p.name,
-          }))
-        );
+        // Only update if products haven't changed
+        if (productsRef.current === products) {
+          setTranslated(
+            products.map((p) => ({ ...p, name: clientCache.get(p.name) || p.name }))
+          );
+        }
       })
-      .catch(() => {
-        // On error, keep original text
-      });
+      .catch(() => {}); // Silently ignore abort errors
+
+    return () => { controller.abort(); };
   }, [products]);
 
-  return translated;
+  return translated.length > 0 ? translated : products;
 }
 
 /**
  * Hook to translate a single text string.
- * Returns translated text (or original while loading).
  */
 export function useTranslatedText(text: string): string {
-  const [result, setResult] = useState(text);
+  const [result, setResult] = useState(() => clientCache.get(text) || text);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    if (!text || !hasChinese(text)) {
-      setResult(text);
-      return;
-    }
+    if (!text) { setResult(''); return; }
 
+    // Check cache first
     if (clientCache.has(text)) {
       setResult(clientCache.get(text)!);
       return;
     }
 
+    if (!hasChinese(text)) {
+      setResult(text);
+      return;
+    }
+
+    // Show original immediately
+    setResult(text);
+
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     fetch('/api/translate/batch', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ texts: [text] }),
+      signal: controller.signal,
     })
       .then((res) => res.json())
       .then((data) => {
+        if (controller.signal.aborted) return;
         const translated = data.translations?.[0];
         if (translated) {
           clientCache.set(text, translated);
@@ -115,6 +116,8 @@ export function useTranslatedText(text: string): string {
         }
       })
       .catch(() => {});
+
+    return () => { controller.abort(); };
   }, [text]);
 
   return result;

@@ -73,8 +73,14 @@ export default function ProductDetailPage() {
   const isWishlisted = useWishlistStore((s) => s.isWishlisted(productId));
   const showToast = useUIStore((s) => s.showToast);
 
+  // Hooks must be called before any early returns
+  const translatedTitle = useTranslatedText(product?.title || '');
+  const translatedShopName = useTranslatedText(product?.shopName || '');
+
   useEffect(() => {
     setLoading(true);
+    setProduct(null);
+    setCurrentImage(0);
     fetch(`/api/products/${productId}`)
       .then((res) => res.json())
       .then((data) => {
@@ -90,8 +96,8 @@ export default function ProductDetailPage() {
   if (loading) {
     return (
       <div className="pb-20">
-        <div className="aspect-square bg-surface-container animate-pulse" />
-        <div className="px-4 py-4 space-y-3">
+        <div className="max-w-2xl mx-auto aspect-square max-h-[500px] bg-surface-container animate-pulse" />
+        <div className="max-w-3xl mx-auto px-4 py-4 space-y-3">
           <div className="h-6 w-32 bg-surface-container rounded animate-pulse" />
           <div className="h-4 w-full bg-surface-container rounded animate-pulse" />
           <div className="h-4 w-2/3 bg-surface-container rounded animate-pulse" />
@@ -105,15 +111,13 @@ export default function ProductDetailPage() {
       <div className="flex flex-col items-center justify-center py-20">
         <span className="material-symbols-outlined text-[48px] text-on-surface-variant/40">error_outline</span>
         <p className="text-on-surface-variant mt-4">상품을 찾을 수 없습니다.</p>
-        <button onClick={() => router.back()} className="mt-4 text-primary text-sm font-medium">
-          뒤로가기
-        </button>
+        <Link href="/" className="mt-4 text-primary text-sm font-medium">
+          홈으로 돌아가기
+        </Link>
       </div>
     );
   }
 
-  const translatedTitle = useTranslatedText(product.title);
-  const translatedShopName = useTranslatedText(product.shopName);
   const images = product.images?.length > 0 ? product.images : [product.imageUrl].filter(Boolean);
   const priceCny = parseFloat(product.priceCny) || 0;
   const moq = product.minOrder || 1;

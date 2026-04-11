@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import ExchangeRateBanner from '@/components/common/ExchangeRateBanner';
 import ProductCard, { type Product } from '@/components/product/ProductCard';
@@ -100,14 +100,6 @@ function PromoBannerCarousel() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
-
-  const next = useCallback(() => {
-    setRawBanners((b) => {
-      if (b.length === 0) return b;
-      setCurrent((c) => (c + 1) % b.length);
-      return b;
-    });
   }, []);
 
   useEffect(() => {
