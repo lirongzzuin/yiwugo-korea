@@ -54,15 +54,15 @@ export default function ShopDetailPage() {
       .then((data) => {
         if (data && !data.error) {
           setShop(data);
-          // Convert srplist products to Product format
+          // Convert srplist products to Product format (API already returns priceCny/priceKrw)
           if (data.products && Array.isArray(data.products)) {
             setShopProducts(
               data.products.map((p: any) => ({
                 id: p.id,
                 name: p.title || '',
                 imageUrl: p.imageUrl || '',
-                priceKRW: Math.round((Number(p.sellPrice || 0) > 100 ? Number(p.sellPrice) / 100 : Number(p.sellPrice)) * 180 * 1.05),
-                priceCNY: Number(p.sellPrice || 0) > 100 ? Number(p.sellPrice) / 100 : Number(p.sellPrice),
+                priceKRW: p.priceKrw || 0,
+                priceCNY: p.priceCny || 0,
                 salesCount: p.salesCount || 0,
                 shopName: data.shopName || '',
               }))
