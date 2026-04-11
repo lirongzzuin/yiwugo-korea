@@ -10,7 +10,6 @@ import ImportDisclaimer from '@/components/product/ImportDisclaimer';
 import SizeGuide from '@/components/product/SizeGuide';
 import { useCartStore } from '@/stores/cart-store';
 import { useWishlistStore } from '@/stores/wishlist-store';
-import { useTranslatedText } from '@/hooks/useTranslation';
 import { useUIStore } from '@/stores/ui-store';
 
 const MOCK_REVIEWS = [
@@ -73,25 +72,50 @@ export default function ProductDetailPage() {
   const isWishlisted = useWishlistStore((s) => s.isWishlisted(productId));
   const showToast = useUIStore((s) => s.showToast);
 
-  // Hooks must be called before any early returns
-  const translatedTitle = useTranslatedText(product?.title || '');
-  const translatedShopName = useTranslatedText(product?.shopName || '');
+  // Translated fields (all translated in one batch for speed)
+  const [tr, setTr] = useState<Record<string, string>>({});
 
   useEffect(() => {
     setLoading(true);
     setProduct(null);
     setCurrentImage(0);
+    setTr({});
     fetch(`/api/products/${productId}`)
       .then((res) => res.json())
       .then((data) => {
         if (data && !data.error) {
           setProduct(data);
           setQuantity(data.minOrder || 10);
+          // Collect all Chinese texts for batch translation
+          const texts: string[] = [
+            data.title || '',
+            data.shopName || '',
+            data.marketInfo || '',
+            ...(data.skuOptions || []).map((s: any) => s.name),
+            ...Object.entries(data.specifications || {}).flatMap(([k, v]) => [k as string, v as string]),
+          ].filter(Boolean);
+          if (texts.length > 0) {
+            fetch('/api/translate/batch', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ texts }),
+            })
+              .then((r) => r.json())
+              .then((d) => {
+                const map: Record<string, string> = {};
+                texts.forEach((t, i) => { if (d.translations?.[i]) map[t] = d.translations[i]; });
+                setTr(map);
+              })
+              .catch(() => {});
+          }
         }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [productId]);
+
+  // Helper: get translated text or original
+  const t = (text: string) => tr[text] || text;
 
   if (loading) {
     return (
@@ -222,7 +246,7 @@ export default function ProductDetailPage() {
 
           <div className="mt-3">
             <h1 className="text-base font-medium text-on-surface leading-snug">
-              {translatedTitle}
+              {t(product.title)}
             </h1>
           </div>
 
@@ -281,7 +305,7 @@ export default function ProductDetailPage() {
                 <span className="material-symbols-outlined text-[24px] text-on-surface-variant/40">store</span>
               </div>
               <div className="flex-1 min-w-0">
-                <h4 className="text-sm font-semibold text-on-surface truncate">{translatedShopName}</h4>
+                <h4 className="text-sm font-semibold text-on-surface truncate">{t(product.shopName)}</h4>
                 {product.boothNumber && (
                   <p className="text-[10px] text-on-surface-variant mt-0.5">
                     부스: {product.boothNumber}
@@ -387,7 +411,7 @@ export default function ProductDetailPage() {
                     />
                   )}
                   <span className="text-xs font-medium text-on-surface whitespace-nowrap">
-                    {sku.name}
+                    {t(sku.name)}
                   </span>
                 </button>
               ))}
@@ -399,7 +423,7 @@ export default function ProductDetailPage() {
         {product.marketInfo && (
           <div className="mx-4 mt-3 px-3 py-2 bg-surface-container rounded-lg flex items-center gap-2">
             <span className="material-symbols-outlined text-[16px] text-on-surface-variant">location_on</span>
-            <span className="text-xs text-on-surface-variant">{product.marketInfo}</span>
+            <span className="text-xs text-on-surface-variant">{t(product.marketInfo)}</span>
           </div>
         )}
 
@@ -410,8 +434,8 @@ export default function ProductDetailPage() {
             <div className="space-y-2">
               {specs.map(([key, value], i) => (
                 <div key={i} className="flex items-center py-1.5 border-b border-outline-variant/10 last:border-0">
-                  <span className="text-xs text-on-surface-variant w-24 flex-shrink-0">{key}</span>
-                  <span className="text-xs font-medium text-on-surface">{value}</span>
+                  <span className="text-xs text-on-surface-variant w-24 flex-shrink-0">{t(key)}</span>
+                  <span className="text-xs font-medium text-on-surface">{t(value)}</span>
                 </div>
               ))}
             </div>

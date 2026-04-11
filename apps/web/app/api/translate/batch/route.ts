@@ -66,8 +66,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ translations: [] });
     }
 
-    // Limit to 20 texts per request
-    const toTranslate = texts.slice(0, 20);
+    // Limit to 50 texts per request (product detail can have many SKU+specs)
+    const toTranslate = texts.slice(0, 50);
 
     // Translate in parallel
     const translations = await Promise.all(
