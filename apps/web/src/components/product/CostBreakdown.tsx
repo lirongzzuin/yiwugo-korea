@@ -261,18 +261,43 @@ export default function CostBreakdown({
 
           {/* Exchange rate info */}
           {exchangeRate && (
-            <div className="flex items-center gap-1.5 text-[10px] text-on-surface-variant/70">
-              <span className="material-symbols-outlined text-[12px]">currency_exchange</span>
-              <span>
-                1 CNY = ₩{exchangeRate.rate.toFixed(2)} |{' '}
-                {exchangeRate.source !== 'fallback' ? exchangeRate.source : '기본 환율'} |{' '}
+            <div className="p-3 bg-blue-50/50 rounded-xl border border-blue-100">
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <span className="material-symbols-outlined text-[14px] text-blue-600">currency_exchange</span>
+                <span className="text-xs font-semibold text-blue-700">결제 적용 환율</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-sm font-bold text-on-surface">
+                    1 CNY = ₩{exchangeRate.rate.toFixed(2)}
+                  </span>
+                  {'baseRate' in exchangeRate && (exchangeRate as any).baseRate && (
+                    <span className="text-[10px] text-on-surface-variant ml-1.5">
+                      (기준율 ₩{(exchangeRate as any).baseRate.toFixed(2)} + 수수료 1.5%)
+                    </span>
+                  )}
+                </div>
+                <div className="text-right">
+                  <span className={cn(
+                    'inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full',
+                    exchangeRate.source === '기본환율' || exchangeRate.source === '캐시'
+                      ? 'bg-orange-100 text-orange-700'
+                      : 'bg-green-100 text-green-700'
+                  )}>
+                    <span className={cn(
+                      'w-1 h-1 rounded-full',
+                      exchangeRate.source === '기본환율' || exchangeRate.source === '캐시'
+                        ? 'bg-orange-500' : 'bg-green-500'
+                    )} />
+                    {exchangeRate.source}
+                  </span>
+                </div>
+              </div>
+              <p className="text-[10px] text-on-surface-variant mt-1">
                 {new Date(exchangeRate.lastUpdated).toLocaleString('ko-KR', {
-                  month: 'short',
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              </span>
+                  month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit',
+                })} 기준 | 결제 시점의 환율이 최종 적용됩니다
+              </p>
             </div>
           )}
 
@@ -280,8 +305,8 @@ export default function CostBreakdown({
           <div className="flex items-start gap-2 p-3 bg-secondary/5 rounded-lg border border-secondary/10">
             <span className="material-symbols-outlined text-secondary text-[16px] mt-0.5 shrink-0">info</span>
             <p className="text-[11px] text-on-surface-variant leading-relaxed">
-              이 금액은 예상치이며, 실제 통관 시 변경될 수 있습니다.
-              환율 변동, 상품 실중량, 세관 판단에 따라 최종 금액이 달라질 수 있습니다.
+              결제 적용 환율은 한국수출입은행 매매기준율에 해외결제 수수료(1.5%)를 반영한 금액입니다.
+              실제 결제 시점의 환율이 최종 적용되며, 통관 시 관부가세는 세관 판단에 따라 변동될 수 있습니다.
             </p>
           </div>
         </div>

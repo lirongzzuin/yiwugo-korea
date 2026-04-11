@@ -33,6 +33,10 @@ export default function ExchangeRateBanner() {
   if (!data) return null;
 
   const isUp = data.change >= 0;
+  const updateTime = new Date(data.lastUpdated).toLocaleString('ko-KR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 
   return (
     <div className="w-full bg-surface-container-low border-b border-outline-variant/30">
@@ -43,12 +47,12 @@ export default function ExchangeRateBanner() {
             currency_exchange
           </span>
           <span className="text-xs font-medium text-on-surface-variant">
-            실시간 환율
+            결제 적용 환율
           </span>
         </div>
 
         {/* Rate */}
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-1 shrink-0">
           <span className="text-sm font-heading font-bold text-on-surface">
             1 CNY = {data.rate.toFixed(2)} KRW
           </span>
@@ -74,14 +78,14 @@ export default function ExchangeRateBanner() {
           </div>
         )}
 
-        {/* Source indicator */}
-        <div className="flex items-center gap-1 shrink-0">
+        {/* Source + time */}
+        <div className="flex items-center gap-1.5 shrink-0">
           <span className={cn(
             'w-1.5 h-1.5 rounded-full',
-            data.source === 'fallback' || data.source === 'cache' ? 'bg-orange-400' : 'bg-green-500'
+            data.source === '기본환율' || data.source === '캐시' ? 'bg-orange-400' : 'bg-green-500'
           )} />
           <span className="text-[10px] text-on-surface-variant/60">
-            {data.source === 'fallback' ? '기본값' : data.source === 'cache' ? '캐시' : 'LIVE'}
+            {data.source} {updateTime}
           </span>
         </div>
       </div>

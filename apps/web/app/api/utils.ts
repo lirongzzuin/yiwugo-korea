@@ -180,7 +180,7 @@ function classifyProduct(title: string, subMarket?: string): string {
  *   - Shop product search (productdetaillist): sellPrice in 分 (cents)
  *   - Product detail: totalprice in 元 (yuan) → use directly
  */
-export function mapProduct(raw: any, rate = 190) {
+export function mapProduct(raw: any, rate = 198) {
   // Determine CNY price from various possible fields
   let priceCny = 0;
   if (raw.totalprice) {

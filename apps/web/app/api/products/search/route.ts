@@ -4,15 +4,21 @@ import { mapProduct } from '../../utils';
 
 export const dynamic = 'force-dynamic';
 
+const OVERSEAS_PAYMENT_FEE_RATE = 0.015;
+
 async function getExchangeRate(): Promise<number> {
   try {
     const res = await fetch('https://open.er-api.com/v6/latest/CNY', { next: { revalidate: 300 } });
     if (res.ok) {
       const json = await res.json();
-      if (json.rates?.KRW) return Math.round(json.rates.KRW * 100) / 100;
+      if (json.rates?.KRW) {
+        const baseRate = Math.round(json.rates.KRW * 100) / 100;
+        // 결제 적용 환율 = 기준율 + 해외결제 수수료 1.5%
+        return Math.round(baseRate * (1 + OVERSEAS_PAYMENT_FEE_RATE) * 100) / 100;
+      }
     }
   } catch { /* fallback */ }
-  return 190;
+  return Math.round(195 * (1 + OVERSEAS_PAYMENT_FEE_RATE) * 100) / 100;
 }
 
 export async function GET(request: NextRequest) {
