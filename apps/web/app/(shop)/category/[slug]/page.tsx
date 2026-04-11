@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { cn } from '@/lib/cn';
 import ProductGrid from '@/components/product/ProductGrid';
 import type { Product } from '@/components/product/ProductCard';
+import { useTranslatedProducts } from '@/hooks/useTranslation';
 
 // Chinese category name → Korean mapping (matches actual API response)
 const CATEGORY_NAME_MAP: Record<string, string> = {
@@ -39,9 +40,10 @@ export default function CategoryPage() {
 
   const [categories, setCategories] = useState<ApiCategory[]>([]);
   const [activeType, setActiveType] = useState<string>(slug);
-  const [products, setProducts] = useState<Product[]>([]);
+  const [rawProducts, setRawProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [catsLoading, setCatsLoading] = useState(true);
+  const products = useTranslatedProducts(rawProducts);
 
   // Fetch API categories
   useEffect(() => {
@@ -69,7 +71,7 @@ export default function CategoryPage() {
       .then((res) => res.json())
       .then((data) => {
         if (data?.data && Array.isArray(data.data)) {
-          setProducts(data.data);
+          setRawProducts(data.data);
         }
       })
       .catch(() => {})

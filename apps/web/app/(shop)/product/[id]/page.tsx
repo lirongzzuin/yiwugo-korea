@@ -10,6 +10,7 @@ import ImportDisclaimer from '@/components/product/ImportDisclaimer';
 import SizeGuide from '@/components/product/SizeGuide';
 import { useCartStore } from '@/stores/cart-store';
 import { useWishlistStore } from '@/stores/wishlist-store';
+import { useTranslatedText } from '@/hooks/useTranslation';
 import { useUIStore } from '@/stores/ui-store';
 
 const MOCK_REVIEWS = [
@@ -111,6 +112,8 @@ export default function ProductDetailPage() {
     );
   }
 
+  const translatedTitle = useTranslatedText(product.title);
+  const translatedShopName = useTranslatedText(product.shopName);
   const images = product.images?.length > 0 ? product.images : [product.imageUrl].filter(Boolean);
   const priceCny = parseFloat(product.priceCny) || 0;
   const moq = product.minOrder || 1;
@@ -215,7 +218,7 @@ export default function ProductDetailPage() {
 
           <div className="mt-3">
             <h1 className="text-base font-medium text-on-surface leading-snug">
-              {product.title}
+              {translatedTitle}
             </h1>
           </div>
 
@@ -274,7 +277,7 @@ export default function ProductDetailPage() {
                 <span className="material-symbols-outlined text-[24px] text-on-surface-variant/40">store</span>
               </div>
               <div className="flex-1 min-w-0">
-                <h4 className="text-sm font-semibold text-on-surface truncate">{product.shopName}</h4>
+                <h4 className="text-sm font-semibold text-on-surface truncate">{translatedShopName}</h4>
                 {product.boothNumber && (
                   <p className="text-[10px] text-on-surface-variant mt-0.5">
                     부스: {product.boothNumber}

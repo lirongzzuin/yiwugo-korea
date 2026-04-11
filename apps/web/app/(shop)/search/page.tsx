@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import ProductGrid from '@/components/product/ProductGrid';
 import type { Product } from '@/components/product/ProductCard';
+import { useTranslatedProducts } from '@/hooks/useTranslation';
 import { cn } from '@/lib/cn';
 
 type SortKey = 'relevance' | 'price_asc' | 'price_desc' | 'sales' | 'newest';
@@ -62,9 +63,10 @@ function SearchPageContent() {
   const [freeShipping, setFreeShipping] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [displayCount, setDisplayCount] = useState(12);
-  const [products, setProducts] = useState<Product[]>([]);
+  const [rawProducts, setRawProducts] = useState<Product[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const products = useTranslatedProducts(rawProducts);
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
@@ -80,7 +82,7 @@ function SearchPageContent() {
       const data = await res.json();
 
       if (data?.data && Array.isArray(data.data)) {
-        setProducts(data.data);
+        setRawProducts(data.data);
         setTotalCount(data.total || data.data.length);
       }
     } catch {

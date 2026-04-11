@@ -5,6 +5,7 @@ import Link from 'next/link';
 import ExchangeRateBanner from '@/components/common/ExchangeRateBanner';
 import ProductCard, { type Product } from '@/components/product/ProductCard';
 import ProductGrid from '@/components/product/ProductGrid';
+import { useTranslatedProducts } from '@/hooks/useTranslation';
 import { cn } from '@/lib/cn';
 
 // Chinese category name → Korean mapping (matches actual API response)
@@ -85,15 +86,16 @@ const POPULAR_TABS = ['전체', '조명', '전자', '주방', '뷰티'] as const
 
 function PromoBannerCarousel() {
   const [current, setCurrent] = useState(0);
-  const [banners, setBanners] = useState<Product[]>([]);
+  const [rawBanners, setRawBanners] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const banners = useTranslatedProducts(rawBanners);
 
   useEffect(() => {
     fetch('/api/products/popular?pageSize=5')
       .then((res) => res.json())
       .then((data) => {
         if (data?.data && Array.isArray(data.data)) {
-          setBanners(data.data.slice(0, 3));
+          setRawBanners(data.data.slice(0, 3));
         }
       })
       .catch(() => {})
@@ -101,7 +103,7 @@ function PromoBannerCarousel() {
   }, []);
 
   const next = useCallback(() => {
-    setBanners((b) => {
+    setRawBanners((b) => {
       if (b.length === 0) return b;
       setCurrent((c) => (c + 1) % b.length);
       return b;
@@ -266,15 +268,16 @@ function CategoryGrid() {
 }
 
 function NewArrivalsSection() {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [rawProducts, setRawProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const products = useTranslatedProducts(rawProducts);
 
   useEffect(() => {
     fetch('/api/products/featured')
       .then((res) => res.json())
       .then((data) => {
         if (data?.data && Array.isArray(data.data)) {
-          setProducts(data.data);
+          setRawProducts(data.data);
         }
       })
       .catch(() => {})
@@ -324,16 +327,17 @@ function NewArrivalsSection() {
 }
 
 function PopularPicksSection() {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [rawProducts, setRawProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>('전체');
+  const products = useTranslatedProducts(rawProducts);
 
   useEffect(() => {
     fetch('/api/products/popular?pageSize=24')
       .then((res) => res.json())
       .then((data) => {
         if (data?.data && Array.isArray(data.data)) {
-          setProducts(data.data);
+          setRawProducts(data.data);
         }
       })
       .catch(() => {})

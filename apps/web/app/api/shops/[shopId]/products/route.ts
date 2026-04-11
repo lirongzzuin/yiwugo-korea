@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as yiwugo from '../../../../../lib/yiwugo-server';
-import { mapProduct, translateProducts } from '../../../utils';
+import { mapProduct } from '../../../utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,12 +28,11 @@ export async function GET(
     });
 
     const products = (result.products || []).map((item: any) => mapProduct(item, 180));
-    const translatedProducts = await translateProducts(products);
 
     return NextResponse.json({
       shopName: result.shopName || '',
       pageSize: result.pageSize || pageSize,
-      products: translatedProducts,
+      products,
     });
   } catch (error) {
     console.error('Error in /api/shops/[shopId]/products:', error);
