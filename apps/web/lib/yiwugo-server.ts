@@ -66,9 +66,10 @@ async function apiGet(path: string, params: Record<string, string> = {}): Promis
  */
 export function normalizeImageUrl(url: string): string {
   if (!url) return '';
-  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  // Convert http to https
+  if (url.startsWith('http://')) return url.replace('http://', 'https://');
+  if (url.startsWith('https://')) return url;
   if (url.startsWith('//')) return 'https:' + url;
-  // Relative path like "i004/2021/..." -> absolute
   return 'https://img1.yiwugo.com/' + url;
 }
 

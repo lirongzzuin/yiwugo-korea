@@ -2,48 +2,67 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import ExchangeRateBanner from '@/components/common/ExchangeRateBanner';
 import ProductCard, { type Product } from '@/components/product/ProductCard';
 import ProductGrid from '@/components/product/ProductGrid';
 import { cn } from '@/lib/cn';
 
-// --- Korean marketing banners ---
-const PROMO_BANNERS = [
-  {
-    id: '1',
-    title: '봄맞이 생활용품 특가전',
-    subtitle: '최대 60% 할인 + 무료배송',
-    gradient: 'from-primary to-primary-container',
-    link: '/category/living',
-  },
-  {
-    id: '2',
-    title: '디지털 액세서리 대전',
-    subtitle: '인기 전자제품 MOQ 50개부터',
-    gradient: 'from-tertiary to-tertiary-container',
-    link: '/category/digital',
-  },
-  {
-    id: '3',
-    title: '여름 패션 사전예약',
-    subtitle: '트렌디한 의류 소싱 찬스',
-    gradient: 'from-secondary to-secondary-container',
-    link: '/category/fashion',
-  },
-];
+// Chinese category name → Korean mapping
+const CATEGORY_NAME_MAP: Record<string, string> = {
+  '饰品': '액세서리',
+  '工艺品': '공예품',
+  '五金': '철물',
+  '箱包': '가방',
+  '服装服饰': '패션의류',
+  '日用百货': '생활잡화',
+  '针纺织品': '섬유직물',
+  '鞋类': '신발',
+  '玩具': '완구',
+  '文体': '문구/체육',
+  '电子电器': '전자/가전',
+  '化妆品': '화장품',
+  '食品': '식품',
+  '汽摩配件': '자동차부품',
+  '母婴用品': '유아용품',
+  '宠物用品': '반려동물',
+  '运动户外': '스포츠/아웃도어',
+  '家居家装': '홈인테리어',
+  '办公文教': '사무/교육',
+  '护肤品': '스킨케어',
+};
 
-const CATEGORIES = [
-  { icon: 'kitchen', label: '생활/주방', slug: 'living' },
-  { icon: 'checkroom', label: '패션/의류', slug: 'fashion' },
-  { icon: 'devices', label: '전자/디지털', slug: 'digital' },
-  { icon: 'spa', label: '뷰티/건강', slug: 'beauty' },
-  { icon: 'toys', label: '문구/완구', slug: 'stationery' },
-  { icon: 'sports_soccer', label: '스포츠', slug: 'sports' },
-  { icon: 'pets', label: '반려동물', slug: 'pets' },
-  { icon: 'build', label: '공구/산업', slug: 'tools' },
-  { icon: 'local_florist', label: '인테리어', slug: 'interior' },
-  { icon: 'more_horiz', label: '전체보기', slug: 'all' },
-];
+// Material icon mapping for categories
+const CATEGORY_ICON_MAP: Record<string, string> = {
+  '饰品': 'diamond',
+  '工艺品': 'palette',
+  '五金': 'build',
+  '箱包': 'luggage',
+  '服装服饰': 'checkroom',
+  '日用百货': 'kitchen',
+  '针纺织品': 'texture',
+  '鞋类': 'steps',
+  '玩具': 'toys',
+  '文体': 'edit',
+  '电子电器': 'devices',
+  '化妆品': 'spa',
+  '食品': 'restaurant',
+  '汽摩配件': 'directions_car',
+  '母婴用品': 'child_care',
+  '宠物用品': 'pets',
+  '运动户外': 'sports_soccer',
+  '家居家装': 'local_florist',
+  '办公文教': 'school',
+  '护肤品': 'face_retouching_natural',
+};
+
+interface ApiCategory {
+  id: number;
+  type: string;
+  entype: string;
+  img?: string;
+  rank?: string;
+}
 
 const POPULAR_TABS = ['전체', '조명', '전자', '주방', '뷰티'] as const;
 
@@ -51,15 +70,52 @@ const POPULAR_TABS = ['전체', '조명', '전자', '주방', '뷰티'] as const
 
 function PromoBannerCarousel() {
   const [current, setCurrent] = useState(0);
+  const [banners, setBanners] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/products/popular?pageSize=5')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.data && Array.isArray(data.data)) {
+          setBanners(data.data.slice(0, 3));
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
 
   const next = useCallback(() => {
-    setCurrent((c) => (c + 1) % PROMO_BANNERS.length);
+    setBanners((b) => {
+      if (b.length === 0) return b;
+      setCurrent((c) => (c + 1) % b.length);
+      return b;
+    });
   }, []);
 
   useEffect(() => {
-    const timer = setInterval(next, 4000);
+    if (banners.length === 0) return;
+    const timer = setInterval(() => {
+      setCurrent((c) => (c + 1) % banners.length);
+    }, 4000);
     return () => clearInterval(timer);
-  }, [next]);
+  }, [banners.length]);
+
+  if (loading) {
+    return (
+      <div className="aspect-[16/9] bg-surface-container rounded-2xl animate-pulse" />
+    );
+  }
+
+  if (banners.length === 0) {
+    return null;
+  }
+
+  const gradients = [
+    'from-primary to-primary-container',
+    'from-tertiary to-tertiary-container',
+    'from-secondary to-secondary-container',
+  ];
 
   return (
     <div className="relative">
@@ -68,25 +124,38 @@ function PromoBannerCarousel() {
           className="flex transition-transform duration-500 ease-out"
           style={{ transform: `translateX(-${current * 100}%)` }}
         >
-          {PROMO_BANNERS.map((banner) => (
+          {banners.map((product, idx) => (
             <Link
-              key={banner.id}
-              href={banner.link}
+              key={product.id}
+              href={`/product/${product.id}`}
               className="w-full flex-shrink-0"
             >
               <div
                 className={cn(
                   'aspect-[16/9] bg-gradient-to-br rounded-2xl p-6 md:p-10 flex flex-col justify-end relative overflow-hidden',
-                  banner.gradient
+                  gradients[idx % gradients.length]
                 )}
               >
-                <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+                {product.imageUrl && (
+                  <div className="absolute inset-0 opacity-30">
+                    <Image
+                      src={product.imageUrl}
+                      alt={product.name}
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
                 <div className="relative z-10 text-white">
-                  <h2 className="text-xl md:text-3xl font-heading font-black mb-1">
-                    {banner.title}
+                  <h2 className="text-xl md:text-3xl font-heading font-black mb-1 line-clamp-1">
+                    {product.name}
                   </h2>
                   <p className="text-sm md:text-base text-white/80">
-                    {banner.subtitle}
+                    {product.priceKRW > 0
+                      ? `${product.priceKRW.toLocaleString()}원 ~ 인기 도매 상품`
+                      : '이우 인기 도매 상품'}
                   </p>
                 </div>
               </div>
@@ -95,7 +164,7 @@ function PromoBannerCarousel() {
         </div>
       </div>
       <div className="flex justify-center gap-1.5 mt-3">
-        {PROMO_BANNERS.map((_, i) => (
+        {banners.map((_, i) => (
           <button
             key={i}
             onClick={() => setCurrent(i)}
@@ -113,24 +182,72 @@ function PromoBannerCarousel() {
 }
 
 function CategoryGrid() {
+  const [categories, setCategories] = useState<ApiCategory[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/categories')
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setCategories(data.slice(0, 10));
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="grid grid-cols-5 gap-2 md:gap-3">
+        {Array.from({ length: 10 }).map((_, i) => (
+          <div key={i} className="flex flex-col items-center gap-1.5 p-2 md:p-3">
+            <div className="w-11 h-11 md:w-12 md:h-12 rounded-full bg-surface-container animate-pulse" />
+            <div className="w-10 h-3 bg-surface-container rounded animate-pulse" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // If API categories loaded, show them; last slot is always "전체보기"
+  const displayCategories = categories.slice(0, 9);
+
   return (
     <div className="grid grid-cols-5 gap-2 md:gap-3">
-      {CATEGORIES.map((cat) => (
-        <Link
-          key={cat.slug}
-          href={cat.slug === 'all' ? '/category' : `/category/${cat.slug}`}
-          className="flex flex-col items-center gap-1.5 p-2 md:p-3 rounded-xl hover:bg-surface-container transition-colors"
-        >
-          <div className="w-11 h-11 md:w-12 md:h-12 rounded-full bg-primary/5 flex items-center justify-center">
-            <span className="material-symbols-outlined text-primary text-[22px] md:text-[24px]">
-              {cat.icon}
+      {displayCategories.map((cat) => {
+        const koreanName = CATEGORY_NAME_MAP[cat.type] || cat.type;
+        const icon = CATEGORY_ICON_MAP[cat.type] || 'category';
+        return (
+          <Link
+            key={cat.id}
+            href={`/search?categoryId=${cat.id}`}
+            className="flex flex-col items-center gap-1.5 p-2 md:p-3 rounded-xl hover:bg-surface-container transition-colors"
+          >
+            <div className="w-11 h-11 md:w-12 md:h-12 rounded-full bg-primary/5 flex items-center justify-center">
+              <span className="material-symbols-outlined text-primary text-[22px] md:text-[24px]">
+                {icon}
+              </span>
+            </div>
+            <span className="text-[11px] md:text-xs font-medium text-on-surface text-center leading-tight">
+              {koreanName}
             </span>
-          </div>
-          <span className="text-[11px] md:text-xs font-medium text-on-surface text-center leading-tight">
-            {cat.label}
+          </Link>
+        );
+      })}
+      <Link
+        href="/category"
+        className="flex flex-col items-center gap-1.5 p-2 md:p-3 rounded-xl hover:bg-surface-container transition-colors"
+      >
+        <div className="w-11 h-11 md:w-12 md:h-12 rounded-full bg-primary/5 flex items-center justify-center">
+          <span className="material-symbols-outlined text-primary text-[22px] md:text-[24px]">
+            more_horiz
           </span>
-        </Link>
-      ))}
+        </div>
+        <span className="text-[11px] md:text-xs font-medium text-on-surface text-center leading-tight">
+          전체보기
+        </span>
+      </Link>
     </div>
   );
 }

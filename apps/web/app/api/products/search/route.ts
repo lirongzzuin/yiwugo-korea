@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as yiwugo from '../../../../lib/yiwugo-server';
-import { mapProduct } from '../../utils';
+import { mapProduct, translateProducts } from '../../utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -49,9 +49,10 @@ export async function GET(request: NextRequest) {
     });
 
     const items = (result.products || []).map((item: any) => mapProduct(item, rate));
+    const translatedItems = await translateProducts(items);
 
     return NextResponse.json({
-      data: items,
+      data: translatedItems,
       total: result.total || 0,
       page,
       pageSize,

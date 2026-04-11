@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as yiwugo from '../../../../lib/yiwugo-server';
 import { normalizeImageUrl } from '../../../../lib/yiwugo-server';
+import { translateProducts } from '../../utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -85,27 +86,60 @@ export async function GET(
       });
     }
 
+    // Translate all Chinese text to Korean
+    const textsToTranslate = [
+      { name: title },
+      { name: shopInfo.shopName || '' },
+      { name: shopInfo.mainProduct || '' },
+      { name: shopBooth.newMarketInfo || shopBooth.marketInfo || shopInfo.marketInfo || '' },
+      ...Object.entries(specifications).flatMap(([k, v]) => [{ name: k }, { name: v }]),
+      ...skuOptions.map((s: any) => ({ name: s.name })),
+    ];
+
+    const translatedAll = await translateProducts(textsToTranslate);
+    const translatedTitle = translatedAll[0]?.name || title;
+    const translatedShopName = translatedAll[1]?.name || shopInfo.shopName || '';
+    const translatedMainProduct = translatedAll[2]?.name || '';
+    const translatedMarketInfo = translatedAll[3]?.name || '';
+
+    // Reconstruct translated specifications (each key and value translated separately)
+    const specEntries = Object.entries(specifications);
+    const translatedSpecs: Record<string, string> = {};
+    specEntries.forEach(([origKey, origVal], i) => {
+      const baseIdx = 4 + i * 2;
+      const tKey = translatedAll[baseIdx]?.name || origKey;
+      const tVal = translatedAll[baseIdx + 1]?.name || origVal;
+      translatedSpecs[tKey] = tVal;
+    });
+
+    // Reconstruct translated SKU options
+    const skuBaseIdx = 4 + specEntries.length * 2;
+    const translatedSkuOptions = skuOptions.map((s: any, i: number) => ({
+      ...s,
+      name: translatedAll[skuBaseIdx + i]?.name || s.name,
+    }));
+
     return NextResponse.json({
       id: String(productId),
-      title,
+      title: translatedTitle,
       priceKrw,
       priceCny: priceCny.toFixed(2),
       imageUrl: images[0] || '',
       images,
-      shopName: shopInfo.shopName || '',
+      shopName: translatedShopName,
       shopId: String(shopInfo.shopId || data.sid || ''),
       salesCount: parseInt(data.dealQuantitys || detailInner.sellCounts || '0', 10),
       minOrder: data.smallnum || vo.startNumber || 1,
       boothNumber: shopBooth.boothno || '',
       description: '',
-      specifications,
+      specifications: translatedSpecs,
       priceTiers,
-      skuOptions,
-      mainProduct: shopInfo.mainProduct || '',
+      skuOptions: translatedSkuOptions,
+      mainProduct: translatedMainProduct,
       defaultFreight: data.defaultfreight || '',
       exchangeService: data.exchangeService || 0,
       metric: vo.metric || '개',
-      marketInfo: shopBooth.newMarketInfo || shopBooth.marketInfo || shopInfo.marketInfo || '',
+      marketInfo: translatedMarketInfo,
     });
   } catch (error) {
     console.error('Error in /api/products/[id]:', error);

@@ -7,23 +7,56 @@ import { cn } from '@/lib/cn';
 import ProductGrid from '@/components/product/ProductGrid';
 import type { Product } from '@/components/product/ProductCard';
 
-const MAIN_CATEGORIES = [
-  { slug: 'living', label: '생활/주방', icon: 'kitchen' },
-  { slug: 'fashion', label: '패션/의류', icon: 'checkroom' },
-  { slug: 'digital', label: '전자/디지털', icon: 'devices' },
-  { slug: 'beauty', label: '뷰티/건강', icon: 'spa' },
-  { slug: 'stationery', label: '문구/완구', icon: 'toys' },
-  { slug: 'sports', label: '스포츠', icon: 'sports_soccer' },
-  { slug: 'pets', label: '반려동물', icon: 'pets' },
-  { slug: 'tools', label: '공구/산업', icon: 'build' },
-  { slug: 'interior', label: '인테리어', icon: 'local_florist' },
-  { slug: 'food', label: '식품/음료', icon: 'restaurant' },
-  { slug: 'auto', label: '자동차', icon: 'directions_car' },
-  { slug: 'kids', label: '유아동', icon: 'child_care' },
-];
+// Chinese category name → Korean mapping
+const CATEGORY_NAME_MAP: Record<string, string> = {
+  '饰品': '액세서리',
+  '工艺品': '공예품',
+  '五金': '철물',
+  '箱包': '가방',
+  '服装服饰': '패션의류',
+  '日用百货': '생활잡화',
+  '针纺织品': '섬유직물',
+  '鞋类': '신발',
+  '玩具': '완구',
+  '文体': '문구/체육',
+  '电子电器': '전자/가전',
+  '化妆品': '화장품',
+  '食品': '식품',
+  '汽摩配件': '자동차부품',
+  '母婴用品': '유아용품',
+  '宠物用品': '반려동물',
+  '运动户外': '스포츠/아웃도어',
+  '家居家装': '홈인테리어',
+  '办公文教': '사무/교육',
+  '护肤品': '스킨케어',
+};
 
-// Category search queries for Yiwugo API
-const CATEGORY_QUERIES: Record<string, string> = {
+// Material icon mapping for categories
+const CATEGORY_ICON_MAP: Record<string, string> = {
+  '饰品': 'diamond',
+  '工艺品': 'palette',
+  '五金': 'build',
+  '箱包': 'luggage',
+  '服装服饰': 'checkroom',
+  '日用百货': 'kitchen',
+  '针纺织品': 'texture',
+  '鞋类': 'steps',
+  '玩具': 'toys',
+  '文体': 'edit',
+  '电子电器': 'devices',
+  '化妆品': 'spa',
+  '食品': 'restaurant',
+  '汽摩配件': 'directions_car',
+  '母婴用品': 'child_care',
+  '宠物用品': 'pets',
+  '运动户外': 'sports_soccer',
+  '家居家装': 'local_florist',
+  '办公文教': 'school',
+  '护肤品': 'face_retouching_natural',
+};
+
+// Slug → Chinese search query mapping (for legacy slug-based URLs)
+const SLUG_QUERY_MAP: Record<string, string> = {
   living: '生活用品',
   fashion: '服装',
   digital: '电子产品',
@@ -38,31 +71,68 @@ const CATEGORY_QUERIES: Record<string, string> = {
   kids: '儿童',
 };
 
-const POPULAR_KEYWORDS: Record<string, string[]> = {
-  living: ['실리콘 주방장갑', '스테인리스 건조대', '무선 믹서기', '에코 세제', '자동 디스펜서'],
-  fashion: ['린넨 원피스', '스니커즈', '미니 크로스백', '실버 반지', '여름 샌들'],
-  digital: ['USB-C 허브', 'LED 스트립', '무선 충전기', '블루투스 스피커', '보조배터리'],
-  beauty: ['메이크업 브러쉬', '네일아트 스티커', '실리콘 세안 브러쉬', '마사지 롤러'],
-  stationery: ['감성 다이어리', '마스킹 테이프', '컬러 젤펜', '데스크 오거나이저'],
-  sports: ['요가 매트', '저항 밴드', '캠핑 체어', '운동 물병'],
-  default: ['인기 도매 상품', '베스트셀러', '신상품', '특가 상품'],
+const SLUG_LABEL_MAP: Record<string, string> = {
+  living: '생활/주방',
+  fashion: '패션/의류',
+  digital: '전자/디지털',
+  beauty: '뷰티/건강',
+  stationery: '문구/완구',
+  sports: '스포츠',
+  pets: '반려동물',
+  tools: '공구/산업',
+  interior: '인테리어',
+  food: '식품/음료',
+  auto: '자동차',
+  kids: '유아동',
 };
+
+interface ApiCategory {
+  id: number;
+  type: string;
+  entype: string;
+  img?: string;
+  rank?: string;
+}
 
 export default function CategoryPage() {
   const params = useParams();
   const slug = params.slug as string;
 
-  const [activeCategory, setActiveCategory] = useState(slug || 'living');
+  const [categories, setCategories] = useState<ApiCategory[]>([]);
+  const [activeCategory, setActiveCategory] = useState<string>(slug);
+  const [activeCategoryId, setActiveCategoryId] = useState<number | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [catsLoading, setCatsLoading] = useState(true);
 
-  const currentCat = MAIN_CATEGORIES.find((c) => c.slug === activeCategory);
-  const keywords = POPULAR_KEYWORDS[activeCategory] || POPULAR_KEYWORDS['default'] || [];
+  // Fetch API categories on mount
+  useEffect(() => {
+    fetch('/api/categories')
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setCategories(data);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setCatsLoading(false));
+  }, []);
 
+  // Fetch products when active category changes
   useEffect(() => {
     setLoading(true);
-    const query = CATEGORY_QUERIES[activeCategory] || currentCat?.label || '';
-    fetch(`/api/products/search?q=${encodeURIComponent(query)}&pageSize=20`)
+
+    let url: string;
+    if (activeCategoryId) {
+      // Use category ID for API categories
+      url = `/api/products/search?q=&categoryId=${activeCategoryId}&pageSize=20`;
+    } else {
+      // Use slug-based Chinese query for legacy slugs
+      const query = SLUG_QUERY_MAP[activeCategory] || activeCategory;
+      url = `/api/products/search?q=${encodeURIComponent(query)}&pageSize=20`;
+    }
+
+    fetch(url)
       .then((res) => res.json())
       .then((data) => {
         if (data?.data && Array.isArray(data.data)) {
@@ -71,7 +141,26 @@ export default function CategoryPage() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [activeCategory, currentCat?.label]);
+  }, [activeCategory, activeCategoryId]);
+
+  // Build sidebar items: use API categories if loaded, fallback to slug-based
+  const sidebarItems = categories.length > 0
+    ? categories.map((cat) => ({
+        key: String(cat.id),
+        label: CATEGORY_NAME_MAP[cat.type] || cat.type,
+        icon: CATEGORY_ICON_MAP[cat.type] || 'category',
+        categoryId: cat.id,
+      }))
+    : Object.entries(SLUG_LABEL_MAP).map(([s, label]) => ({
+        key: s,
+        label,
+        icon: 'category',
+        categoryId: null as number | null,
+      }));
+
+  const currentLabel = activeCategoryId
+    ? sidebarItems.find((s) => s.categoryId === activeCategoryId)?.label || '카테고리'
+    : SLUG_LABEL_MAP[activeCategory] || '카테고리';
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -79,38 +168,55 @@ export default function CategoryPage() {
         {/* Sidebar */}
         <aside className="w-20 md:w-24 flex-shrink-0 bg-surface-container-lowest border-r border-outline-variant/20 overflow-y-auto">
           <nav className="py-2">
-            {MAIN_CATEGORIES.map((cat) => (
-              <button
-                key={cat.slug}
-                onClick={() => setActiveCategory(cat.slug)}
-                className={cn(
-                  'w-full flex flex-col items-center gap-1 py-3 px-1 text-center transition-colors relative',
-                  activeCategory === cat.slug
-                    ? 'bg-primary/5 text-primary'
-                    : 'text-on-surface-variant hover:bg-surface-container'
-                )}
-              >
-                {activeCategory === cat.slug && (
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-8 bg-primary rounded-r-full" />
-                )}
-                <span
-                  className={cn(
-                    'material-symbols-outlined text-[22px]',
-                    activeCategory === cat.slug ? 'text-primary' : ''
-                  )}
-                  style={
-                    activeCategory === cat.slug
-                      ? { fontVariationSettings: "'FILL' 1" }
-                      : undefined
-                  }
-                >
-                  {cat.icon}
-                </span>
-                <span className="text-[10px] md:text-[11px] font-medium leading-tight">
-                  {cat.label}
-                </span>
-              </button>
-            ))}
+            {catsLoading ? (
+              Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="w-full flex flex-col items-center gap-1 py-3 px-1">
+                  <div className="w-6 h-6 bg-surface-container rounded animate-pulse" />
+                  <div className="w-10 h-3 bg-surface-container rounded animate-pulse mt-1" />
+                </div>
+              ))
+            ) : (
+              sidebarItems.map((item) => {
+                const isActive = item.categoryId
+                  ? activeCategoryId === item.categoryId
+                  : activeCategory === item.key;
+                return (
+                  <button
+                    key={item.key}
+                    onClick={() => {
+                      setActiveCategory(item.key);
+                      setActiveCategoryId(item.categoryId);
+                    }}
+                    className={cn(
+                      'w-full flex flex-col items-center gap-1 py-3 px-1 text-center transition-colors relative',
+                      isActive
+                        ? 'bg-primary/5 text-primary'
+                        : 'text-on-surface-variant hover:bg-surface-container'
+                    )}
+                  >
+                    {isActive && (
+                      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-8 bg-primary rounded-r-full" />
+                    )}
+                    <span
+                      className={cn(
+                        'material-symbols-outlined text-[22px]',
+                        isActive ? 'text-primary' : ''
+                      )}
+                      style={
+                        isActive
+                          ? { fontVariationSettings: "'FILL' 1" }
+                          : undefined
+                      }
+                    >
+                      {item.icon}
+                    </span>
+                    <span className="text-[10px] md:text-[11px] font-medium leading-tight">
+                      {item.label}
+                    </span>
+                  </button>
+                );
+              })
+            )}
           </nav>
         </aside>
 
@@ -119,7 +225,7 @@ export default function CategoryPage() {
           {/* Category header */}
           <div>
             <h1 className="text-lg font-heading font-bold text-on-surface mb-1">
-              {currentCat?.label || '카테고리'}
+              {currentLabel}
             </h1>
           </div>
 
@@ -130,7 +236,7 @@ export default function CategoryPage() {
                 <span className="material-symbols-outlined text-[32px]">campaign</span>
                 <div>
                   <h3 className="font-heading font-bold text-sm md:text-base">
-                    {currentCat?.label} 할인 기획전
+                    {currentLabel} 할인 기획전
                   </h3>
                   <p className="text-xs text-white/80 mt-0.5">
                     인기 상품 최대 40% 할인 진행 중
@@ -159,24 +265,6 @@ export default function CategoryPage() {
                 <p className="text-on-surface-variant mt-3 text-sm">상품을 불러오는 중입니다...</p>
               </div>
             )}
-          </section>
-
-          {/* Popular keywords */}
-          <section className="pb-4">
-            <h2 className="text-base font-heading font-bold text-on-surface mb-3">
-              인기 검색어
-            </h2>
-            <div className="flex flex-wrap gap-2">
-              {keywords.map((kw) => (
-                <Link
-                  key={kw}
-                  href={`/search?q=${encodeURIComponent(kw)}`}
-                  className="px-3 py-1.5 rounded-full bg-surface-container text-xs font-medium text-on-surface-variant hover:bg-primary/10 hover:text-primary transition-colors"
-                >
-                  {kw}
-                </Link>
-              ))}
-            </div>
           </section>
         </main>
       </div>
