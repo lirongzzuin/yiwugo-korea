@@ -20,6 +20,19 @@ const MOCK_REVIEWS = [
 
 type TabKey = 'detail' | 'reviews' | 'inquiry';
 
+interface PriceTier {
+  startNumber: number;
+  endNumber: number | null;
+  sellPrice: number;
+}
+
+interface SkuOption {
+  name: string;
+  imageUrl: string;
+  price: number;
+  stock: number;
+}
+
 interface ProductDetail {
   id: string;
   title: string;
@@ -35,6 +48,11 @@ interface ProductDetail {
   description: string;
   specifications: Record<string, string>;
   mainProduct: string;
+  priceTiers?: PriceTier[];
+  skuOptions?: SkuOption[];
+  metric?: string;
+  marketInfo?: string;
+  defaultFreight?: string;
 }
 
 export default function ProductDetailPage() {
@@ -308,6 +326,75 @@ export default function ProductDetailPage() {
             </span>
           </div>
         </div>
+
+        {/* Price Tiers */}
+        {product.priceTiers && product.priceTiers.length > 1 && (
+          <div className="mx-4 mt-3 p-4 bg-surface-container-lowest rounded-xl border border-outline-variant/20">
+            <h3 className="text-sm font-semibold text-on-surface mb-3 flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[18px] text-secondary">sell</span>
+              수량별 단가
+            </h3>
+            <div className="grid grid-cols-3 gap-2">
+              {product.priceTiers.map((tier, i) => (
+                <div
+                  key={i}
+                  className={cn(
+                    'text-center p-2 rounded-lg border transition-colors',
+                    quantity >= tier.startNumber && (tier.endNumber === null || quantity <= tier.endNumber)
+                      ? 'border-primary bg-primary/5'
+                      : 'border-outline-variant/20'
+                  )}
+                >
+                  <p className="text-[10px] text-on-surface-variant">
+                    {tier.startNumber}{tier.endNumber ? `~${tier.endNumber}` : '+'}개
+                  </p>
+                  <p className="text-sm font-bold text-on-surface">
+                    ¥{tier.sellPrice.toFixed(2)}
+                  </p>
+                  <p className="text-[10px] text-on-surface-variant">
+                    ≈ {Math.round(tier.sellPrice * 190 * 1.05).toLocaleString()}원
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* SKU Options */}
+        {product.skuOptions && product.skuOptions.length > 0 && (
+          <div className="mx-4 mt-3 p-4 bg-surface-container-lowest rounded-xl border border-outline-variant/20">
+            <h3 className="text-sm font-semibold text-on-surface mb-3">
+              옵션 ({product.skuOptions.length}종)
+            </h3>
+            <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+              {product.skuOptions.map((sku, i) => (
+                <button
+                  key={i}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg border border-outline-variant/30 hover:border-primary/50 transition-colors flex-shrink-0"
+                >
+                  {sku.imageUrl && (
+                    <img
+                      src={sku.imageUrl}
+                      alt={sku.name}
+                      className="w-8 h-8 rounded object-cover"
+                    />
+                  )}
+                  <span className="text-xs font-medium text-on-surface whitespace-nowrap">
+                    {sku.name}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Market Info */}
+        {product.marketInfo && (
+          <div className="mx-4 mt-3 px-3 py-2 bg-surface-container rounded-lg flex items-center gap-2">
+            <span className="material-symbols-outlined text-[16px] text-on-surface-variant">location_on</span>
+            <span className="text-xs text-on-surface-variant">{product.marketInfo}</span>
+          </div>
+        )}
 
         {/* Specs Table */}
         {specs.length > 0 && (
