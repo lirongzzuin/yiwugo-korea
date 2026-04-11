@@ -7,54 +7,44 @@ import { cn } from '@/lib/cn';
 interface CostBreakdownProps {
   priceCny: number;
   quantity: number;
-  weightKg?: number; // optional - user can adjust
+  weightKg?: number; // unused for now (no weight data from API)
   shippingMethod?: 'AIR' | 'SEA';
 }
 
-// Shipping cost constants (based on 2025-2026 China→Korea logistics market rates)
-// Source: 배대지 업체 평균 시세 (123go, 직싸, 포스트팀 등)
-const AIR_RATE_PER_KG = 3500;   // 항공특송: 약 3,000~4,000원/kg
-const SEA_RATE_PER_KG = 1000;   // 해운: 약 800~1,500원/kg
-const BASE_SHIPPING_FEE = 3000; // 기본 취급수수료
-const COMMISSION_RATE = 0.05;   // 플랫폼 수수료 5%
-const DUTY_FREE_LIMIT_USD = 150; // 목록통관 면세 한도 US$150
-const CUSTOMS_DUTY_RATE = 0.08; // 관세율 8% (일반 공산품 기준)
-const VAT_RATE = 0.10;          // 부가세 10%
-const USD_TO_KRW = 1380;        // USD 환율 (근사값)
+// Fixed shipping costs (to be refined when actual logistics partnership is established)
+const AIR_SHIPPING_FIXED = 15000;  // 항공: 고정 15,000원
+const SEA_SHIPPING_FIXED = 8000;   // 해운: 고정 8,000원
+const COMMISSION_RATE = 0.05;      // 플랫폼 수수료 5%
+const DUTY_FREE_LIMIT_USD = 150;   // 목록통관 면세 한도 US$150
+const CUSTOMS_DUTY_RATE = 0.08;    // 관세율 8% (일반 공산품 기준)
+const VAT_RATE = 0.10;             // 부가세 10%
+const USD_TO_KRW = 1380;           // USD 환율 (근사값)
 
 const TOOLTIP_TEXTS: Record<string, string> = {
   product: '중국 위안화(CNY) 가격에 실시간 환율을 적용한 원화 환산 금액입니다.',
-  shipping: '상품 총 중량 기준으로 계산됩니다. 항공은 빠르지만 비용이 높고, 해운은 저렴하지만 시간이 더 걸립니다.',
+  shipping: '국제 배송비는 건당 고정 금액입니다. 실제 배송비는 상품 중량과 부피에 따라 달라질 수 있으며, 주문 확정 시 정확한 금액이 안내됩니다.',
   duty: '과세가격(상품가 + 배송비) 기준 8% 관세가 부과됩니다. 미화 $150 이하는 관세가 면제됩니다.',
   vat: '과세가격(상품가 + 배송비 + 관세)의 10%가 부가세로 부과됩니다. 면세 기준 이하 시 면제됩니다.',
   commission: '이우고 코리아 플랫폼 수수료(상품가의 5%)입니다. 검수, 통관 대행, 고객 지원이 포함됩니다.',
-  weight: '상품의 실제 총 중량을 입력하면 더 정확한 배송비를 확인할 수 있습니다. 기본값은 개당 약 0.3kg으로 추정한 값입니다.',
 };
 
 export default function CostBreakdown({
   priceCny,
   quantity,
-  weightKg: initialWeightKg,
   shippingMethod: defaultMethod = 'AIR',
 }: CostBreakdownProps) {
   const { data: exchangeRate, isLoading } = useExchangeRate();
   const [method, setMethod] = useState<'AIR' | 'SEA'>(defaultMethod);
   const [isExpanded, setIsExpanded] = useState(true);
   const [showTooltip, setShowTooltip] = useState<string | null>(null);
-  // Estimated total weight (user-adjustable, default: rough estimate based on quantity)
-  const defaultTotalWeight = initialWeightKg
-    ? Math.round(initialWeightKg * quantity * 10) / 10
-    : Math.max(1, Math.round(quantity * 0.3 * 10) / 10); // 0.3kg per item default estimate
-  const [totalWeightKg, setTotalWeightKg] = useState(defaultTotalWeight);
 
   const costs = useMemo(() => {
     const rate = exchangeRate?.rate || 190;
     const totalCny = priceCny * quantity;
     const productKrw = Math.round(totalCny * rate);
 
-    // Shipping based on user-set total weight
-    const ratePerKg = method === 'AIR' ? AIR_RATE_PER_KG : SEA_RATE_PER_KG;
-    const shippingKrw = Math.round(totalWeightKg * ratePerKg + BASE_SHIPPING_FEE);
+    // Fixed shipping fee (independent of quantity/weight)
+    const shippingKrw = method === 'AIR' ? AIR_SHIPPING_FIXED : SEA_SHIPPING_FIXED;
 
     // Commission
     const commissionKrw = Math.round(productKrw * COMMISSION_RATE);
@@ -82,7 +72,7 @@ export default function CostBreakdown({
       rate,
       deliveryDays: method === 'AIR' ? '3-5' : '10-14',
     };
-  }, [priceCny, quantity, totalWeightKg, method, exchangeRate]);
+  }, [priceCny, quantity, method, exchangeRate]);
 
   const handleTooltipToggle = (key: string) => {
     setShowTooltip((prev) => (prev === key ? null : key));
@@ -162,51 +152,6 @@ export default function CostBreakdown({
             </button>
           </div>
 
-          {/* Total weight input */}
-          <div className="p-3 bg-surface-container-low rounded-xl">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[16px] text-on-surface-variant">scale</span>
-                <span className="text-xs font-medium text-on-surface">총 예상 중량</span>
-                <button
-                  onClick={() => handleTooltipToggle('weight')}
-                  className="w-4 h-4 rounded-full bg-surface-container flex items-center justify-center"
-                >
-                  <span className="text-[10px] text-on-surface-variant font-bold">?</span>
-                </button>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={() => setTotalWeightKg(Math.max(0.5, Math.round((totalWeightKg - 1) * 10) / 10))}
-                  className="w-7 h-7 rounded-lg border border-outline-variant/40 flex items-center justify-center hover:border-primary text-on-surface-variant"
-                >
-                  <span className="material-symbols-outlined text-[14px]">remove</span>
-                </button>
-                <input
-                  type="number"
-                  value={totalWeightKg}
-                  onChange={(e) => setTotalWeightKg(Math.max(0.1, parseFloat(e.target.value) || 0.5))}
-                  className="w-16 h-7 text-center border border-outline-variant/40 rounded-lg text-sm font-medium bg-transparent focus:border-primary focus:outline-none"
-                  step="0.5"
-                  min="0.1"
-                />
-                <button
-                  onClick={() => setTotalWeightKg(Math.round((totalWeightKg + 1) * 10) / 10)}
-                  className="w-7 h-7 rounded-lg border border-outline-variant/40 flex items-center justify-center hover:border-primary text-on-surface-variant"
-                >
-                  <span className="material-symbols-outlined text-[14px]">add</span>
-                </button>
-                <span className="text-xs text-on-surface-variant">kg</span>
-              </div>
-            </div>
-            {showTooltip === 'weight' && (
-              <p className="text-[11px] text-on-surface-variant mt-2 leading-relaxed">
-                상품의 실제 중량을 입력하면 더 정확한 배송비를 확인할 수 있습니다.
-                기본값은 개당 약 0.3kg으로 추정한 값입니다.
-              </p>
-            )}
-          </div>
-
           {/* Cost line items */}
           <div className="space-y-0">
             {/* Product price */}
@@ -224,7 +169,7 @@ export default function CostBreakdown({
             <CostLineItem
               icon={method === 'AIR' ? 'flight' : 'sailing'}
               label="국제 배송비"
-              sublabel={`${totalWeightKg.toFixed(1)}kg × ₩${method === 'AIR' ? AIR_RATE_PER_KG.toLocaleString() : SEA_RATE_PER_KG.toLocaleString()}/kg + 기본료`}
+              sublabel={method === 'AIR' ? '항공 배송 (건당 고정)' : '해운 배송 (건당 고정)'}
               amount={costs.shippingKrw}
               tooltipKey="shipping"
               showTooltip={showTooltip}
