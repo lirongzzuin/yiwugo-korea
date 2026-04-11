@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import ExchangeRateBanner from '@/components/common/ExchangeRateBanner';
 import ProductCard, { type Product } from '@/components/product/ProductCard';
@@ -31,10 +31,26 @@ const CATEGORY_ICON_MAP: Record<string, string> = {
 };
 
 // Fallback Korean promo banners (used when API has no popular products)
+// Images: Unsplash (free for commercial use, no attribution required)
 const FALLBACK_BANNERS = [
-  { title: '이우 시장 200만개 상품', subtitle: '중국 최대 도매시장 이우에서 직소싱', gradient: 'from-primary to-primary-container' },
-  { title: '실시간 환율 적용', subtitle: 'CNY→KRW 자동 환산, 관부가세 계산까지', gradient: 'from-tertiary to-tertiary-container' },
-  { title: '원스톱 물류 서비스', subtitle: '검수 → 합포장 → 통관 → 국내배송', gradient: 'from-secondary to-secondary-container' },
+  {
+    title: '이우 시장 200만개 상품',
+    subtitle: '중국 최대 도매시장 이우에서 직소싱',
+    gradient: 'from-primary to-primary-container',
+    imageUrl: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800&h=450&fit=crop&q=80',
+  },
+  {
+    title: '결제 기준 환율 실시간 적용',
+    subtitle: '한국수출입은행 기준 CNY→KRW 자동 환산',
+    gradient: 'from-tertiary to-tertiary-container',
+    imageUrl: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=800&h=450&fit=crop&q=80',
+  },
+  {
+    title: '원스톱 물류 서비스',
+    subtitle: '검수 → 합포장 → 통관 → 국내배송',
+    gradient: 'from-secondary to-secondary-container',
+    imageUrl: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=800&h=450&fit=crop&q=80',
+  },
 ];
 
 interface ApiCategory {
@@ -124,7 +140,12 @@ function PromoBannerCarousel() {
             : FALLBACK_BANNERS.map((banner, idx) => (
                 <Link key={idx} href="/search" className="w-full flex-shrink-0">
                   <div className={cn('aspect-[16/9] bg-gradient-to-br rounded-2xl p-6 md:p-10 flex flex-col justify-end relative overflow-hidden', banner.gradient)}>
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+                    {banner.imageUrl && (
+                      <div className="absolute inset-0 opacity-25">
+                        <img src={banner.imageUrl} alt="" className="w-full h-full object-cover" loading={idx === 0 ? 'eager' : 'lazy'} />
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
                     <div className="relative z-10 text-white">
                       <h2 className="text-xl md:text-3xl font-heading font-black mb-1">{banner.title}</h2>
                       <p className="text-sm md:text-base text-white/80">{banner.subtitle}</p>
@@ -292,31 +313,73 @@ function NewArrivalsSection() {
 function PopularPicksSection() {
   const [rawProducts, setRawProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [activeTab, setActiveTab] = useState<string>('전체');
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
   const [fetchKey, setFetchKey] = useState(0);
   const translated = useTranslatedProducts(rawProducts);
   const products = translated.length > 0 ? translated : rawProducts;
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  const fetchPage = useCallback(async (pageNum: number, append: boolean) => {
+    if (pageNum === 1) setLoading(true);
+    else setLoadingMore(true);
+
+    try {
+      const size = 24;
+      let url = `/api/products/popular?pageSize=${size}&page=${pageNum}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      let items = data?.data || [];
+
+      // Fallback to search if popular returns empty
+      if (items.length === 0 && pageNum === 1) {
+        const res2 = await fetch(`/api/products/search?pageSize=${size}&page=${pageNum}`);
+        const data2 = await res2.json();
+        items = data2?.data || [];
+      }
+
+      if (append) {
+        setRawProducts((prev) => [...prev, ...items]);
+      } else {
+        setRawProducts(items);
+      }
+      setHasMore(items.length >= size);
+    } catch {
+      setHasMore(false);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  }, []);
 
   useEffect(() => {
-    setLoading(true);
-    fetch('/api/products/popular?pageSize=24')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data?.data?.length > 0) {
-          setRawProducts(data.data);
-        } else {
-          return fetch('/api/products/search?pageSize=24')
-            .then((r) => r.json())
-            .then((d) => { if (d?.data?.length > 0) setRawProducts(d.data); });
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [fetchKey]);
+    fetchPage(1, false);
+  }, [fetchPage, fetchKey]);
 
   useEffect(() => {
     if (!loading && rawProducts.length === 0) setFetchKey((k) => k + 1);
   }, [loading, rawProducts.length]);
+
+  // Infinite scroll
+  const loadMore = useCallback(() => {
+    if (loadingMore || !hasMore) return;
+    const next = page + 1;
+    setPage(next);
+    fetchPage(next, true);
+  }, [page, loadingMore, hasMore, fetchPage]);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      (entries) => { if (entries[0].isIntersecting && hasMore && !loading && !loadingMore) loadMore(); },
+      { rootMargin: '400px' }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [loadMore, hasMore, loading, loadingMore]);
 
   const filteredProducts = activeTab === '전체' ? products : products.filter((p) => p.category === activeTab);
 
@@ -339,6 +402,10 @@ function PopularPicksSection() {
     <section>
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-heading font-bold text-on-surface">인기 상품</h2>
+        <Link href="/search?sort=sales" className="text-xs text-on-surface-variant flex items-center gap-0.5 hover:text-primary transition-colors">
+          전체보기
+          <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+        </Link>
       </div>
       <div className="flex gap-2 mb-4 overflow-x-auto scrollbar-hide">
         {POPULAR_TABS.map((tab) => (
@@ -355,6 +422,20 @@ function PopularPicksSection() {
         ))}
       </div>
       <ProductGrid products={filteredProducts} columns={2} />
+
+      {/* Infinite scroll sentinel */}
+      <div ref={sentinelRef} className="h-4" />
+      {loadingMore && (
+        <div className="flex items-center justify-center py-6 gap-2">
+          <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+          <span className="text-sm text-on-surface-variant">상품을 불러오는 중...</span>
+        </div>
+      )}
+      {!hasMore && products.length > 20 && (
+        <div className="text-center py-6">
+          <p className="text-xs text-on-surface-variant/60">{products.length}개 상품을 모두 불러왔습니다</p>
+        </div>
+      )}
     </section>
   );
 }

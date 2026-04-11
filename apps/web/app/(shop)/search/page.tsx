@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import ProductGrid from '@/components/product/ProductGrid';
@@ -44,6 +44,8 @@ const SORT_MAP: Record<SortKey, string> = {
   newest: 'newest',
 };
 
+const PAGE_SIZE = 24;
+
 export default function SearchPage() {
   return (
     <Suspense fallback={<div className="max-w-7xl mx-auto px-4 lg:px-8 py-4"><div className="animate-pulse h-96 bg-surface-container rounded-xl" /></div>}>
@@ -63,40 +65,89 @@ function SearchPageContent() {
   const [certifiedOnly, setCertifiedOnly] = useState(false);
   const [freeShipping, setFreeShipping] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  const [displayCount, setDisplayCount] = useState(12);
+
   const [rawProducts, setRawProducts] = useState<Product[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
   const products = useTranslatedProducts(rawProducts);
 
-  const fetchProducts = useCallback(async () => {
-    setLoading(true);
+  // Infinite scroll sentinel ref
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  // Initial fetch
+  const fetchProducts = useCallback(async (pageNum = 1, append = false) => {
+    if (pageNum === 1) setLoading(true);
+    else setLoadingMore(true);
+
     try {
       const params = new URLSearchParams();
       if (query) params.set('q', query);
       if (categoryId) params.set('categoryId', categoryId);
-      params.set('page', '1');
-      params.set('pageSize', '48');
+      params.set('page', String(pageNum));
+      params.set('pageSize', String(PAGE_SIZE));
       if (SORT_MAP[sort]) params.set('sortBy', SORT_MAP[sort]);
 
       const res = await fetch(`/api/products/search?${params}`);
       const data = await res.json();
 
       if (data?.data && Array.isArray(data.data)) {
-        setRawProducts(data.data);
+        if (append) {
+          setRawProducts((prev) => [...prev, ...data.data]);
+        } else {
+          setRawProducts(data.data);
+        }
         setTotalCount(data.total || data.data.length);
+        setHasMore(data.data.length >= PAGE_SIZE);
+      } else {
+        if (!append) setRawProducts([]);
+        setHasMore(false);
       }
     } catch {
-      // silent
+      if (!append) setRawProducts([]);
+      setHasMore(false);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }, [query, categoryId, sort]);
 
+  // Reset and fetch when query/sort changes
   useEffect(() => {
-    fetchProducts();
+    setPage(1);
+    setHasMore(true);
+    fetchProducts(1, false);
   }, [fetchProducts]);
 
+  // Load more function
+  const loadMore = useCallback(() => {
+    if (loadingMore || !hasMore) return;
+    const nextPage = page + 1;
+    setPage(nextPage);
+    fetchProducts(nextPage, true);
+  }, [page, loadingMore, hasMore, fetchProducts]);
+
+  // Intersection Observer for infinite scroll
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loading && !loadingMore) {
+          loadMore();
+        }
+      },
+      { rootMargin: '300px' }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [loadMore, hasMore, loading, loadingMore]);
+
+  // Client-side filtering
   const filteredProducts = useMemo(() => {
     let result = [...products];
 
@@ -127,26 +178,23 @@ function SearchPageContent() {
       });
     }
 
-    // Client-side sort (price sort backup)
+    // Certified shop filter
+    if (certifiedOnly) {
+      result = result.filter((p) => (p.salesCount || 0) >= 100);
+    }
+
+    // Free shipping filter
+    if (freeShipping) {
+      result = result.filter((p) => p.priceKRW >= 10000);
+    }
+
+    // Client-side sort
     if (sort === 'price_asc') result.sort((a, b) => a.priceKRW - b.priceKRW);
     if (sort === 'price_desc') result.sort((a, b) => b.priceKRW - a.priceKRW);
     if (sort === 'sales') result.sort((a, b) => (b.salesCount || 0) - (a.salesCount || 0));
 
     return result;
-    // Certified shop filter (shops with high sales)
-    if (certifiedOnly) {
-      result = result.filter((p) => (p.salesCount || 0) >= 100);
-    }
-
-    // Free shipping filter (low-price items often have free shipping threshold)
-    if (freeShipping) {
-      result = result.filter((p) => p.priceKRW >= 10000);
-    }
-
   }, [products, priceRange, moqRange, sort, certifiedOnly, freeShipping]);
-
-  const displayedProducts = filteredProducts.slice(0, displayCount);
-  const hasMore = displayCount < filteredProducts.length;
 
   return (
     <div className="max-w-7xl mx-auto px-4 lg:px-8 py-4">
@@ -157,11 +205,18 @@ function SearchPageContent() {
             <>
               <span className="text-primary">&lsquo;{query}&rsquo;</span>{' '}
               <span className="text-on-surface-variant font-normal">
-                {filteredProducts.length.toLocaleString()}개
+                {totalCount > 0 ? `${totalCount.toLocaleString()}개` : ''}
               </span>
             </>
           ) : (
-            '전체 상품'
+            <>
+              전체 상품
+              {totalCount > 0 && (
+                <span className="text-on-surface-variant font-normal ml-2">
+                  {totalCount.toLocaleString()}개
+                </span>
+              )}
+            </>
           )}
         </h1>
         <button
@@ -173,7 +228,7 @@ function SearchPageContent() {
         </button>
       </div>
 
-      {/* Sort chips - always visible */}
+      {/* Sort chips */}
       <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-3">
         {SORT_OPTIONS.map((opt) => (
           <button
@@ -215,7 +270,7 @@ function SearchPageContent() {
         </button>
       </div>
 
-      {/* Expanded filter panel */}
+      {/* Expanded filter panel (mobile) */}
       {showFilters && (
         <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/30 p-4 mb-4 animate-slide-down space-y-4 md:hidden">
           <div>
@@ -306,12 +361,12 @@ function SearchPageContent() {
         {/* Results */}
         <div className="flex-1">
           {loading ? (
-            <div className="grid grid-cols-2 gap-3">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="h-[280px] bg-surface-container rounded-xl animate-pulse" />
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="aspect-square bg-surface-container rounded-xl animate-pulse" />
               ))}
             </div>
-          ) : displayedProducts.length === 0 ? (
+          ) : filteredProducts.length === 0 ? (
             <div className="text-center py-16">
               <span className="material-symbols-outlined text-[56px] text-on-surface-variant/30">search_off</span>
               <p className="text-on-surface font-medium mt-4">
@@ -348,19 +403,29 @@ function SearchPageContent() {
               )}
             </div>
           ) : (
-            <ProductGrid products={displayedProducts} columns={2} />
-          )}
+            <>
+              <ProductGrid products={filteredProducts} columns={2} />
 
-          {/* Load more */}
-          {hasMore && !loading && (
-            <div className="flex justify-center mt-6">
-              <button
-                onClick={() => setDisplayCount((c) => c + 12)}
-                className="px-8 py-2.5 rounded-full border border-outline-variant/50 text-sm font-medium text-on-surface-variant hover:border-primary hover:text-primary transition-colors"
-              >
-                더보기
-              </button>
-            </div>
+              {/* Infinite scroll sentinel */}
+              <div ref={sentinelRef} className="h-4" />
+
+              {/* Loading more indicator */}
+              {loadingMore && (
+                <div className="flex items-center justify-center py-8 gap-2">
+                  <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                  <span className="text-sm text-on-surface-variant">상품을 불러오는 중...</span>
+                </div>
+              )}
+
+              {/* End of results */}
+              {!hasMore && filteredProducts.length > 0 && (
+                <div className="text-center py-8">
+                  <p className="text-xs text-on-surface-variant/60">
+                    {filteredProducts.length.toLocaleString()}개 상품을 모두 불러왔습니다
+                  </p>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
