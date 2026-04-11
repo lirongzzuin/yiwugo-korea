@@ -360,7 +360,7 @@ export default function ProductDetailPage() {
             <div>
               <span className="material-symbols-outlined text-[20px] text-on-surface-variant">schedule</span>
               <p className="text-xs font-semibold text-on-surface mt-1">배송 7~14일</p>
-              <p className="text-[10px] text-on-surface-variant">예상 소��</p>
+              <p className="text-[10px] text-on-surface-variant">예상 소요</p>
             </div>
             <div>
               <span className="material-symbols-outlined text-[20px] text-on-surface-variant">gavel</span>
@@ -369,7 +369,7 @@ export default function ProductDetailPage() {
             </div>
             <div>
               <span className="material-symbols-outlined text-[20px] text-on-surface-variant">fact_check</span>
-              <p className="text-xs font-semibold text-on-surface mt-1">검수 ���비스</p>
+              <p className="text-xs font-semibold text-on-surface mt-1">검수 서비스</p>
               <p className="text-[10px] text-on-surface-variant">품질 확인</p>
             </div>
           </div>
@@ -501,7 +501,7 @@ export default function ProductDetailPage() {
               </button>
             </div>
             <span className="text-xs text-on-surface-variant">
-              합��� <span className="font-bold text-primary text-sm">{((product.priceKrw || 0) * quantity).toLocaleString()}원</span>
+              합계 <span className="font-bold text-primary text-sm">{((product.priceKrw || 0) * quantity).toLocaleString()}원</span>
             </span>
           </div>
         </div>
@@ -621,7 +621,7 @@ export default function ProductDetailPage() {
                       상세 정보가 아직 등록되지 않았습니다.
                     </p>
                     <p className="text-xs text-on-surface-variant/60 mt-1">
-                      문��하기 탭에서 판매자에게 직접 문의해 보세요.
+                      문의하기 탭에서 판매자에게 직접 문의해 보세요.
                     </p>
                   </div>
                 )}
@@ -731,10 +731,10 @@ export default function ProductDetailPage() {
                   궁금한 점이 있으시면 문의해 주세요
                 </p>
                 <p className="text-xs text-on-surface-variant/60 mb-5">
-                  판매자가 영��시간 내 답변드립니다
+                  판매자가 영업시간 내 답변드립니다
                 </p>
                 <button className="px-6 py-2.5 bg-primary text-white rounded-full text-sm font-medium hover:bg-primary-container transition-colors">
-                  문의 작성��기
+                  문의 작성하기
                 </button>
               </div>
             )}
