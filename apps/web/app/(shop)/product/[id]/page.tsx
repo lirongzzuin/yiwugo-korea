@@ -171,17 +171,17 @@ export default function ProductDetailPage() {
 
   return (
     <div className="pb-20">
-      {/* Image Gallery - constrained on desktop */}
-      <div className="relative bg-surface-container max-w-2xl mx-auto">
-        <div className="aspect-square max-h-[500px] overflow-hidden">
+      {/* Image Gallery */}
+      <div className="relative bg-white max-w-3xl mx-auto">
+        <div className="flex items-center justify-center min-h-[280px] md:min-h-[400px] max-h-[70vh] overflow-hidden">
           {images[currentImage] ? (
             <img
               src={images[currentImage]}
               alt={product.title}
-              className="w-full h-full object-contain"
+              className="w-full h-auto max-h-[70vh] object-contain"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center bg-surface-container">
+            <div className="w-full h-[300px] flex items-center justify-center bg-surface-container">
               <span className="material-symbols-outlined text-[64px] text-on-surface-variant/30">image</span>
             </div>
           )}
