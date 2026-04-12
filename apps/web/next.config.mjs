@@ -2,6 +2,9 @@
 const nextConfig = {
   output: 'standalone',
   transpilePackages: ['@yiwugo/shared', '@yiwugo/ui'],
+  experimental: {
+    instrumentationHook: true,
+  },
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: '**.yiwugo.com' },

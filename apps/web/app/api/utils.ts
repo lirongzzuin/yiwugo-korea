@@ -1,5 +1,5 @@
 import { normalizeImageUrl } from '../../lib/yiwugo-server';
-import { translateText as translateTextService, translateSync } from '../../lib/translation-service';
+import { translateText as translateTextService, translateSync, translateBatch } from '../../lib/translation-service';
 
 /**
  * 이우고 시장 구역(subMarket) → 카테고리 매핑
@@ -121,53 +121,118 @@ function classifyProduct(title: string, subMarket?: string): string {
 }
 
 /**
- * Map raw Yiwugo product data to the frontend Product shape.
- * Compatible with ProductCard component interface.
- *
- * Yiwugo price fields:
- *   - Product list (prslist): sellPrice in 分 (cents) → divide by 100 for CNY
- *   - Shop product search (productdetaillist): sellPrice in 分 (cents)
- *   - Product detail: totalprice in 元 (yuan) → use directly
+ * 원시 Yiwugo 상품 데이터에서 공통 필드를 추출 (번역 제외)
+ * 내부 헬퍼 - mapProduct/mapProductsAsync에서 공유
  */
-export function mapProduct(raw: any, rate = 198) {
-  // Determine CNY price from various possible fields
+function extractProductFields(raw: any, rate: number) {
   let priceCny = 0;
   if (raw.totalprice) {
     priceCny = parseFloat(raw.totalprice);
   } else if (raw.sellPrice !== undefined) {
     const sellPrice = Number(raw.sellPrice);
-    // sellPrice is in 分 (cents) — divide by 100 to get CNY
     priceCny = sellPrice / 100;
   }
 
   const priceKrw = Math.round(priceCny * rate * 1.05);
-
-  // Normalize image URL
   const imageUrl = normalizeImageUrl(raw.picture1 || raw.imgUrl || raw.picUrl || '');
-
   const rawTitle = raw.title || raw.productName || raw.newtitle || '';
   const rawShopName = raw.shopName || '';
   const category = raw.categoryName || classifyProduct(rawTitle, raw.subMarket);
 
-  // 서버사이드 즉시 번역 (캐시 + 용어사전) - API 호출 없음, 매우 빠름
-  const title = translateSync(rawTitle);
-  const shopName = translateSync(rawShopName);
-
   return {
     id: String(raw.id || raw.productId || raw.num || ''),
-    name: title,
-    nameOriginal: rawTitle !== title ? rawTitle : undefined,
+    rawTitle,
+    rawShopName,
     imageUrl,
     category,
     priceKRW: priceKrw,
     priceCNY: Number(priceCny.toFixed(2)),
     moq: parseInt(raw.startNum || raw.smallNum || raw.beginNumber || '1', 10),
     salesCount: parseInt(raw.dealQuantitys || raw.dealQuantity || raw.sellCounts || '0', 10),
-    shopName,
     shopId: String(raw.shopId || ''),
     boothNumber: raw.boothNo || '',
+  };
+}
+
+/**
+ * @deprecated
+ * 동기 버전 (캐시 + 용어사전만). 가능하면 mapProductsAsync를 사용하세요.
+ * 번역이 누락될 수 있습니다.
+ */
+export function mapProduct(raw: any, rate = 198) {
+  const base = extractProductFields(raw, rate);
+  // 서버사이드 즉시 번역 (캐시 + 용어사전)
+  const title = translateSync(base.rawTitle);
+  const shopName = translateSync(base.rawShopName);
+
+  return {
+    id: base.id,
+    name: title,
+    nameOriginal: base.rawTitle !== title ? base.rawTitle : undefined,
+    imageUrl: base.imageUrl,
+    category: base.category,
+    priceKRW: base.priceKRW,
+    priceCNY: base.priceCNY,
+    moq: base.moq,
+    salesCount: base.salesCount,
+    shopName,
+    shopId: base.shopId,
+    boothNumber: base.boothNumber,
     badge: null as 'TOP' | 'SALE' | 'HOT' | 'NEW' | null,
   };
+}
+
+/**
+ * 여러 상품을 한 번에 완전 번역하여 매핑
+ *
+ * - 모든 상품명/상점명을 수집해서 translateBatch로 한 번에 번역
+ * - 캐시 히트가 대부분이면 매우 빠름
+ * - 캐시 미스가 있으면 API 호출 (3초 타임아웃)
+ * - 클라이언트는 100% 번역된 데이터만 받음 → "점프 현상" 제거
+ */
+export async function mapProductsAsync(rawProducts: any[], rate = 198) {
+  if (!Array.isArray(rawProducts) || rawProducts.length === 0) return [];
+
+  // 1. 기본 필드 추출
+  const extracted = rawProducts.map((raw) => extractProductFields(raw, rate));
+
+  // 2. 번역할 텍스트 수집 (중복 제거)
+  const textsToTranslate = new Set<string>();
+  extracted.forEach((item) => {
+    if (item.rawTitle) textsToTranslate.add(item.rawTitle);
+    if (item.rawShopName) textsToTranslate.add(item.rawShopName);
+  });
+
+  const uniqueTexts = Array.from(textsToTranslate);
+
+  // 3. 일괄 번역
+  const translations = await translateBatch(uniqueTexts);
+  const translationMap = new Map<string, string>();
+  uniqueTexts.forEach((text, i) => {
+    translationMap.set(text, translations[i] || text);
+  });
+
+  // 4. 번역 결과 매핑
+  return extracted.map((item) => {
+    const title = translationMap.get(item.rawTitle) || item.rawTitle;
+    const shopName = translationMap.get(item.rawShopName) || item.rawShopName;
+
+    return {
+      id: item.id,
+      name: title,
+      nameOriginal: item.rawTitle !== title ? item.rawTitle : undefined,
+      imageUrl: item.imageUrl,
+      category: item.category,
+      priceKRW: item.priceKRW,
+      priceCNY: item.priceCNY,
+      moq: item.moq,
+      salesCount: item.salesCount,
+      shopName,
+      shopId: item.shopId,
+      boothNumber: item.boothNumber,
+      badge: null as 'TOP' | 'SALE' | 'HOT' | 'NEW' | null,
+    };
+  });
 }
 
 // Translate a batch of mapped products (translate names)

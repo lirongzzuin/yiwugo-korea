@@ -3,7 +3,7 @@
  *
  * 아키텍처:
  *   1. 메모리 캐시 (가장 빠름)
- *   2. 파일 캐시 (/tmp 또는 .next/cache - 서버 재시작 시에도 유지)
+ *   2. 파일 캐시 (.next/cache - 서버 재시작 시에도 유지)
  *   3. 용어사전 적용 (API 호출 없이 즉시)
  *   4. MyMemory API (타임아웃 3초)
  *   5. 원문 폴백
@@ -13,34 +13,63 @@
  * - 용어사전만으로 80%+ 번역 커버
  * - API 실패해도 글로사리 폴백으로 차단
  * - 중복 요청 병합 (같은 텍스트 동시 요청 시 1번만 API 호출)
+ * - Node.js 런타임 전용 (Edge Runtime에서는 파일 캐시 비활성화)
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
 import { applyGlossary, hasChinese, chineseRatio } from './translation-glossary';
 
 // ─── 캐시 설정 ───────────────────────────────────────
 const MEMORY_CACHE_MAX = 10000;
 const API_TIMEOUT_MS = 3000;
-const CACHE_FILE = path.join(process.cwd(), '.next', 'cache', 'translations.json');
+const CACHE_FILE_NAME = 'translations.json';
 
 // ─── 메모리 캐시 ─────────────────────────────────────
 const memoryCache = new Map<string, string>();
 const pendingRequests = new Map<string, Promise<string>>();
 
-// ─── 파일 캐시 ───────────────────────────────────────
+// ─── 파일 캐시 (Node.js runtime only) ────────────────
 let fileCacheLoaded = false;
 let fileCacheDirty = false;
 let lastFlushTime = 0;
-const FLUSH_INTERVAL_MS = 60_000; // 1분마다 디스크 반영
+const FLUSH_INTERVAL_MS = 60_000;
+
+// Node.js 전용 모듈을 런타임에만 조건부 로드 (webpack이 Edge에서도 번들하지 않도록)
+function getNodeFs(): any {
+  if (typeof process === 'undefined' || !process.versions?.node) return null;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
+    return eval('require')('fs');
+  } catch {
+    return null;
+  }
+}
+function getNodePath(): any {
+  if (typeof process === 'undefined' || !process.versions?.node) return null;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
+    return eval('require')('path');
+  } catch {
+    return null;
+  }
+}
+
+function getCacheFile(): string | null {
+  const path = getNodePath();
+  if (!path) return null;
+  return path.join(process.cwd(), '.next', 'cache', CACHE_FILE_NAME);
+}
 
 function loadFileCache(): void {
   if (fileCacheLoaded) return;
   fileCacheLoaded = true;
 
+  const fs = getNodeFs();
+  const cacheFile = getCacheFile();
+  if (!fs || !cacheFile) return;
+
   try {
-    if (fs.existsSync(CACHE_FILE)) {
-      const content = fs.readFileSync(CACHE_FILE, 'utf-8');
+    if (fs.existsSync(cacheFile)) {
+      const content = fs.readFileSync(cacheFile, 'utf-8');
       const data = JSON.parse(content) as Record<string, string>;
       Object.entries(data).forEach(([k, v]) => {
         if (memoryCache.size < MEMORY_CACHE_MAX) {
@@ -59,23 +88,28 @@ function flushFileCache(force = false): void {
   const now = Date.now();
   if (!force && now - lastFlushTime < FLUSH_INTERVAL_MS) return;
 
+  const fs = getNodeFs();
+  const path = getNodePath();
+  const cacheFile = getCacheFile();
+  if (!fs || !path || !cacheFile) return;
+
   try {
-    const dir = path.dirname(CACHE_FILE);
+    const dir = path.dirname(cacheFile);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
     const obj: Record<string, string> = {};
     memoryCache.forEach((v, k) => { obj[k] = v; });
-    fs.writeFileSync(CACHE_FILE, JSON.stringify(obj), 'utf-8');
+    fs.writeFileSync(cacheFile, JSON.stringify(obj), 'utf-8');
     fileCacheDirty = false;
     lastFlushTime = now;
-  } catch (err) {
+  } catch {
     // Vercel serverless 환경에서는 실패할 수 있으나 무시 (메모리 캐시는 여전히 동작)
   }
 }
 
 // 프로세스 종료 시 강제 flush
-if (typeof process !== 'undefined') {
+if (typeof process !== 'undefined' && process.on) {
   process.on('beforeExit', () => flushFileCache(true));
 }
 
@@ -119,7 +153,6 @@ async function callMyMemory(text: string): Promise<string | null> {
 
     const res = await fetch(url, {
       signal: controller.signal,
-      // Next.js 캐시 사용
       next: { revalidate: 86400 },
     });
     clearTimeout(timeoutId);
@@ -142,11 +175,10 @@ async function callMyMemory(text: string): Promise<string | null> {
  *
  * 폴백 체인:
  *   1. 메모리/파일 캐시 히트
- *   2. 중국어가 30% 미만이면 용어사전만 적용
- *   3. 용어사전 적용 후 결과가 원문과 다르면 사용 (빠른 경로)
- *   4. MyMemory API 호출 (3초 타임아웃)
- *   5. API 성공 시 결과에 용어사전 재적용
- *   6. 실패 시 용어사전 폴백
+ *   2. 중국어가 20% 미만이면 용어사전만 적용
+ *   3. MyMemory API 호출 (3초 타임아웃)
+ *   4. API 성공 시 결과에 용어사전 재적용
+ *   5. 실패 시 용어사전 폴백
  */
 export async function translateText(text: string): Promise<string> {
   if (!text || text.length === 0) return '';
@@ -193,7 +225,7 @@ export async function translateText(text: string): Promise<string> {
 
 /**
  * 배치 번역 - Promise.all로 병렬 처리
- * 최대 50개까지 처리
+ * 최대 100개까지 처리
  */
 export async function translateBatch(texts: string[]): Promise<string[]> {
   if (!Array.isArray(texts) || texts.length === 0) return [];
@@ -217,11 +249,13 @@ export function translateSync(text: string): string {
  */
 export function getCacheStats() {
   loadFileCache();
+  const fs = getNodeFs();
+  const cacheFile = getCacheFile();
   return {
     memorySize: memoryCache.size,
     maxSize: MEMORY_CACHE_MAX,
-    cacheFile: CACHE_FILE,
-    fileExists: fs.existsSync(CACHE_FILE),
+    cacheFile: cacheFile || '(edge runtime)',
+    fileExists: fs && cacheFile ? fs.existsSync(cacheFile) : false,
   };
 }
 

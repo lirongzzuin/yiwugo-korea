@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as yiwugo from '../../../../lib/yiwugo-server';
-import { mapProduct } from '../../utils';
+import { mapProductsAsync } from '../../utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,7 +54,8 @@ export async function GET(request: NextRequest) {
       shopId: shopId || undefined,
     });
 
-    const items = (result.products || []).map((item: any) => mapProduct(item, rate));
+    // 전체 상품을 한 번에 배치 번역 (캐시 우선, API 백업)
+    const items = await mapProductsAsync(result.products || [], rate);
 
     return NextResponse.json({
       data: items,
