@@ -1,56 +1,5 @@
 import { normalizeImageUrl } from '../../lib/yiwugo-server';
-
-const GLOSSARY: Record<string, string> = {
-  '包邮': '무료배송', '爆款': '인기상품', '批发': '도매', '厂家直销': '공장직판',
-  '现货': '즉시발송', '新款': '신상품', '热卖': '인기판매', '一件代发': '소량배송',
-  '义乌': '이우', '地摊': '노점', '网红': '인플루언서', '同款': '동일상품',
-};
-
-function applyGlossary(text: string): string {
-  let result = text;
-  for (const [zh, ko] of Object.entries(GLOSSARY)) {
-    result = result.replaceAll(zh, ko);
-  }
-  return result;
-}
-
-// Simple server-side translation cache
-const transCache = new Map<string, string>();
-
-async function translateText(text: string): Promise<string> {
-  if (!text) return '';
-  const cacheKey = text.substring(0, 100);
-  if (transCache.has(cacheKey)) return transCache.get(cacheKey)!;
-
-  const chineseCharCount = (text.match(/[\u4e00-\u9fff]/g) || []).length;
-  if (chineseCharCount < text.length * 0.3) {
-    const result = applyGlossary(text);
-    transCache.set(cacheKey, result);
-    return result;
-  }
-
-  try {
-    // Send original Chinese text to translation API first, then apply glossary
-    const res = await fetch(
-      `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text.substring(0, 500))}&langpair=zh-CN|ko`,
-      { signal: AbortSignal.timeout(3000) }
-    );
-    if (res.ok) {
-      const json = await res.json();
-      let translated = json?.responseData?.translatedText || '';
-      if (translated && translated !== text) {
-        // Apply glossary on translated result for fine-tuning
-        translated = applyGlossary(translated);
-        transCache.set(cacheKey, translated);
-        return translated;
-      }
-    }
-  } catch { /* fallback */ }
-
-  const fallback = applyGlossary(text);
-  transCache.set(cacheKey, fallback);
-  return fallback;
-}
+import { translateText as translateTextService, translateSync } from '../../lib/translation-service';
 
 /**
  * 이우고 시장 구역(subMarket) → 카테고리 매핑
@@ -196,19 +145,25 @@ export function mapProduct(raw: any, rate = 198) {
   // Normalize image URL
   const imageUrl = normalizeImageUrl(raw.picture1 || raw.imgUrl || raw.picUrl || '');
 
-  const title = raw.title || raw.productName || raw.newtitle || '';
-  const category = raw.categoryName || classifyProduct(title, raw.subMarket);
+  const rawTitle = raw.title || raw.productName || raw.newtitle || '';
+  const rawShopName = raw.shopName || '';
+  const category = raw.categoryName || classifyProduct(rawTitle, raw.subMarket);
+
+  // 서버사이드 즉시 번역 (캐시 + 용어사전) - API 호출 없음, 매우 빠름
+  const title = translateSync(rawTitle);
+  const shopName = translateSync(rawShopName);
 
   return {
     id: String(raw.id || raw.productId || raw.num || ''),
     name: title,
+    nameOriginal: rawTitle !== title ? rawTitle : undefined,
     imageUrl,
     category,
     priceKRW: priceKrw,
     priceCNY: Number(priceCny.toFixed(2)),
     moq: parseInt(raw.startNum || raw.smallNum || raw.beginNumber || '1', 10),
     salesCount: parseInt(raw.dealQuantitys || raw.dealQuantity || raw.sellCounts || '0', 10),
-    shopName: raw.shopName || '',
+    shopName,
     shopId: String(raw.shopId || ''),
     boothNumber: raw.boothNo || '',
     badge: null as 'TOP' | 'SALE' | 'HOT' | 'NEW' | null,
@@ -219,9 +174,14 @@ export function mapProduct(raw: any, rate = 198) {
 export async function translateProducts(products: any[]): Promise<any[]> {
   const results = await Promise.all(
     products.map(async (p) => {
-      const translatedName = await translateText(p.name);
+      const translatedName = await translateTextService(p.name);
       return { ...p, name: translatedName };
     })
   );
   return results;
+}
+
+// 동기 번역 (캐시 + 용어사전만, API 호출 없음) - 빠른 상품명 번역
+export function translateProductSync(name: string): string {
+  return translateSync(name);
 }

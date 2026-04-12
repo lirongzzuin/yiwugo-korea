@@ -85,22 +85,25 @@ export default function ProductDetailPage() {
   const showToast = useUIStore((s) => s.showToast);
   const addRecentItem = useRecentStore((s: any) => s.addItem);
 
-  const [tr, setTr] = useState<Record<string, string>>({});
+  // 서버에서 이미 번역된 데이터를 보내므로 클라이언트 번역은 불필요
+  // tr 객체는 호환성을 위해 유지하되 비어있음
+  const tr: Record<string, string> = {};
 
   useEffect(() => {
     setLoading(true);
     setProduct(null);
     setCurrentImage(0);
-    setTr({});
     setSelectedSku(null);
     setImageLoaded(false);
-    fetch(`/api/products/${productId}`)
+    // AbortController로 이전 요청 취소 (빠른 네비게이션 대응)
+    const controller = new AbortController();
+    fetch(`/api/products/${productId}`, { signal: controller.signal })
       .then((res) => res.json())
       .then((data) => {
         if (data && !data.error) {
           setProduct(data);
           setQuantity(data.minOrder || 10);
-          // 최근 본 상품에 기록
+          // 최근 본 상품에 기록 (서버에서 이미 번역된 이름 사용)
           addRecentItem({
             id: String(data.id || productId),
             name: data.title || '',
@@ -110,34 +113,15 @@ export default function ProductDetailPage() {
             category: data.categoryName || '',
             viewedAt: new Date().toISOString(),
           });
-          const texts: string[] = [
-            data.title || '',
-            data.shopName || '',
-            data.marketInfo || '',
-            data.categoryName || '',
-            data.parentCategoryName || '',
-            ...(data.skuOptions || []).map((s: any) => s.name),
-            ...Object.entries(data.specifications || {}).flatMap(([k, v]) => [k as string, v as string]),
-          ].filter(Boolean);
-          if (texts.length > 0) {
-            fetch('/api/translate/batch', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ texts }),
-            })
-              .then((r) => r.json())
-              .then((d) => {
-                const map: Record<string, string> = {};
-                texts.forEach((t, i) => { if (d.translations?.[i]) map[t] = d.translations[i]; });
-                setTr(map);
-              })
-              .catch(() => {});
-          }
         }
       })
-      .catch(() => {})
+      .catch((err) => {
+        if (err?.name !== 'AbortError') console.error(err);
+      })
       .finally(() => setLoading(false));
-  }, [productId]);
+
+    return () => controller.abort();
+  }, [productId, addRecentItem]);
 
   const t = (text: string) => tr[text] || text;
 

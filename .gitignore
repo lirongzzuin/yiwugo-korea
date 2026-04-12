@@ -125,6 +125,9 @@ package-lock.json.bak
 tmp/
 temp/
 
+# Translation cache (persistent cross-restart)
+apps/web/.next/cache/translations.json
+
 # ========================================
 # Uploads & User generated content
 # ========================================

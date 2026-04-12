@@ -7,6 +7,7 @@ import ProductGrid from '@/components/product/ProductGrid';
 import type { Product } from '@/components/product/ProductCard';
 import { useTranslatedProducts } from '@/hooks/useTranslation';
 import { cn } from '@/lib/cn';
+import { savePageState, loadPageState, restoreScrollPosition } from '@/lib/page-cache';
 
 type SortKey = 'relevance' | 'price_asc' | 'price_desc' | 'sales' | 'newest';
 type PriceRange = 'all' | 'under5k' | '5k-20k' | '20k-50k' | 'over50k';
@@ -54,24 +55,45 @@ export default function SearchPage() {
   );
 }
 
+interface SearchCacheState {
+  rawProducts: Product[];
+  totalCount: number;
+  page: number;
+  hasMore: boolean;
+  sort: SortKey;
+  priceRange: PriceRange;
+  moqRange: MoqRange;
+  certifiedOnly: boolean;
+  freeShipping: boolean;
+}
+
 function SearchPageContent() {
   const searchParams = useSearchParams();
   const query = searchParams.get('q') || '';
   const categoryId = searchParams.get('categoryId') || '';
+  const cacheKey = `search:${query}:${categoryId}`;
 
-  const [sort, setSort] = useState<SortKey>('relevance');
-  const [priceRange, setPriceRange] = useState<PriceRange>('all');
-  const [moqRange, setMoqRange] = useState<MoqRange>('all');
-  const [certifiedOnly, setCertifiedOnly] = useState(false);
-  const [freeShipping, setFreeShipping] = useState(false);
+  // 캐시에서 초기 상태 복원
+  const cachedRef = useRef<SearchCacheState | null>(null);
+  if (cachedRef.current === null && typeof window !== 'undefined') {
+    const cached = loadPageState<SearchCacheState>(cacheKey);
+    if (cached) cachedRef.current = cached.data;
+  }
+
+  const [sort, setSort] = useState<SortKey>(cachedRef.current?.sort || 'relevance');
+  const [priceRange, setPriceRange] = useState<PriceRange>(cachedRef.current?.priceRange || 'all');
+  const [moqRange, setMoqRange] = useState<MoqRange>(cachedRef.current?.moqRange || 'all');
+  const [certifiedOnly, setCertifiedOnly] = useState(cachedRef.current?.certifiedOnly || false);
+  const [freeShipping, setFreeShipping] = useState(cachedRef.current?.freeShipping || false);
   const [showFilters, setShowFilters] = useState(false);
 
-  const [rawProducts, setRawProducts] = useState<Product[]>([]);
-  const [totalCount, setTotalCount] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [rawProducts, setRawProducts] = useState<Product[]>(cachedRef.current?.rawProducts || []);
+  const [totalCount, setTotalCount] = useState(cachedRef.current?.totalCount || 0);
+  const [loading, setLoading] = useState(cachedRef.current?.rawProducts ? false : true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(cachedRef.current?.page || 1);
+  const [hasMore, setHasMore] = useState(cachedRef.current?.hasMore ?? true);
+  const [restoredFromCache, setRestoredFromCache] = useState(!!cachedRef.current);
   const products = useTranslatedProducts(rawProducts);
 
   // Infinite scroll sentinel ref
@@ -124,10 +146,48 @@ function SearchPageContent() {
 
   // Reset and fetch when query/sort changes
   useEffect(() => {
+    // 캐시 복원된 경우 첫 렌더에서는 fetch 건너뛰고 스크롤만 복원
+    if (restoredFromCache) {
+      setRestoredFromCache(false);
+      const cached = loadPageState<SearchCacheState>(cacheKey);
+      if (cached) {
+        restoreScrollPosition(cached.scrollY);
+      }
+      return;
+    }
     setPage(1);
     setHasMore(true);
     fetchProducts(1, false);
-  }, [fetchProducts]);
+  }, [fetchProducts, cacheKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 상품 클릭 등으로 페이지 이탈 시 상태 저장
+  useEffect(() => {
+    if (loading || rawProducts.length === 0) return;
+    const handleSave = () => {
+      savePageState<SearchCacheState>(cacheKey, {
+        rawProducts,
+        totalCount,
+        page,
+        hasMore,
+        sort,
+        priceRange,
+        moqRange,
+        certifiedOnly,
+        freeShipping,
+      });
+    };
+
+    // 페이지 이탈 감지
+    window.addEventListener('beforeunload', handleSave);
+    // Link 클릭으로 이동 시를 대비해 주기적으로 저장
+    const interval = setInterval(handleSave, 2000);
+
+    return () => {
+      handleSave();
+      window.removeEventListener('beforeunload', handleSave);
+      clearInterval(interval);
+    };
+  }, [cacheKey, rawProducts, totalCount, page, hasMore, sort, priceRange, moqRange, certifiedOnly, freeShipping, loading]);
 
   // Load more function
   const loadMore = useCallback(() => {

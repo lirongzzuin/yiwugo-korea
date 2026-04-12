@@ -1,13 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { cn } from '@/lib/cn';
 import ProductGrid from '@/components/product/ProductGrid';
 import type { Product } from '@/components/product/ProductCard';
 import { useTranslatedProducts } from '@/hooks/useTranslation';
+import { savePageState, loadPageState, restoreScrollPosition } from '@/lib/page-cache';
 
-// Chinese category name → Korean mapping (matches actual API response)
+// Chinese category name → Korean mapping
 const CATEGORY_NAME_MAP: Record<string, string> = {
   '辅料': '부자재', '配饰': '패션잡화', '医疗器械': '의료기기', '五金': '철물/공구',
   '机械': '기계', '鞋靴': '신발', '家电': '가전', '数码': '디지털',
@@ -34,49 +35,96 @@ interface ApiCategory {
   entype: string;
 }
 
+interface CategoryCacheState {
+  rawProducts: Product[];
+  activeType: string;
+}
+
 export default function CategoryPage() {
   const params = useParams();
   const slug = decodeURIComponent(params.slug as string);
+  const cacheKey = `category:${slug}`;
+
+  // 캐시에서 복원
+  const cachedRef = useRef<CategoryCacheState | null>(null);
+  if (cachedRef.current === null && typeof window !== 'undefined') {
+    const cached = loadPageState<CategoryCacheState>(cacheKey);
+    if (cached) cachedRef.current = cached.data;
+  }
 
   const [categories, setCategories] = useState<ApiCategory[]>([]);
-  const [activeType, setActiveType] = useState<string>(slug);
-  const [rawProducts, setRawProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [activeType, setActiveType] = useState<string>(cachedRef.current?.activeType || slug);
+  const [rawProducts, setRawProducts] = useState<Product[]>(cachedRef.current?.rawProducts || []);
+  const [loading, setLoading] = useState(cachedRef.current?.rawProducts ? false : true);
   const [catsLoading, setCatsLoading] = useState(true);
+  const [restoredFromCache, setRestoredFromCache] = useState(!!cachedRef.current);
   const products = useTranslatedProducts(rawProducts);
 
   // Fetch API categories
   useEffect(() => {
-    fetch('/api/categories')
+    const controller = new AbortController();
+    fetch('/api/categories', { signal: controller.signal })
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) {
           setCategories(data);
-          // If slug matches a Chinese type name, use it; otherwise find closest match
           const match = data.find((c: ApiCategory) => c.type === slug);
-          if (match) {
+          if (match && !cachedRef.current) {
             setActiveType(match.type);
           }
         }
       })
-      .catch(() => {})
+      .catch((err) => {
+        if (err?.name !== 'AbortError') console.error(err);
+      })
       .finally(() => setCatsLoading(false));
+
+    return () => controller.abort();
   }, [slug]);
 
   // Fetch products when active category changes
   useEffect(() => {
+    // 캐시 복원된 경우 첫 렌더에서는 fetch 건너뛰고 스크롤만 복원
+    if (restoredFromCache) {
+      setRestoredFromCache(false);
+      const cached = loadPageState<CategoryCacheState>(cacheKey);
+      if (cached) restoreScrollPosition(cached.scrollY);
+      return;
+    }
+
     setLoading(true);
-    const query = activeType;
-    fetch(`/api/products/search?q=${encodeURIComponent(query)}&pageSize=24`)
+    const controller = new AbortController();
+    fetch(`/api/products/search?q=${encodeURIComponent(activeType)}&pageSize=24`, {
+      signal: controller.signal,
+    })
       .then((res) => res.json())
       .then((data) => {
         if (data?.data && Array.isArray(data.data)) {
           setRawProducts(data.data);
         }
       })
-      .catch(() => {})
+      .catch((err) => {
+        if (err?.name !== 'AbortError') console.error(err);
+      })
       .finally(() => setLoading(false));
-  }, [activeType]);
+
+    return () => controller.abort();
+  }, [activeType, cacheKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 페이지 이탈 시 상태 저장
+  useEffect(() => {
+    if (loading || rawProducts.length === 0) return;
+    const handleSave = () => {
+      savePageState<CategoryCacheState>(cacheKey, { rawProducts, activeType });
+    };
+    window.addEventListener('beforeunload', handleSave);
+    const interval = setInterval(handleSave, 2000);
+    return () => {
+      handleSave();
+      window.removeEventListener('beforeunload', handleSave);
+      clearInterval(interval);
+    };
+  }, [cacheKey, rawProducts, activeType, loading]);
 
   const currentLabel = CATEGORY_NAME_MAP[activeType] || activeType;
 
@@ -139,7 +187,6 @@ export default function CategoryPage() {
             </h1>
           </div>
 
-          {/* Promotional banner */}
           <div className="bg-gradient-to-r from-secondary to-secondary-container rounded-xl p-4 md:p-5 text-white">
             <div className="flex items-center gap-3">
               <span className="material-symbols-outlined text-[32px]">campaign</span>
@@ -154,7 +201,6 @@ export default function CategoryPage() {
             </div>
           </div>
 
-          {/* Products */}
           <section>
             <h2 className="text-base font-heading font-bold text-on-surface mb-3">
               상품 목록

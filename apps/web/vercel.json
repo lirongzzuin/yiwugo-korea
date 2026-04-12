@@ -1,5 +1,11 @@
 {
   "framework": "nextjs",
   "installCommand": "npm install",
-  "buildCommand": "npx next build"
+  "buildCommand": "npx next build",
+  "crons": [
+    {
+      "path": "/api/cron/prefetch-translations",
+      "schedule": "0 */4 * * *"
+    }
+  ]
 }
