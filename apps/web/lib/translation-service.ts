@@ -18,8 +18,8 @@ import { applyGlossary, hasChinese, chineseRatio } from './translation-glossary'
 
 // ─── 설정 ───────────────────────────────────────────
 const MEMORY_CACHE_MAX = 5000;
-const API_TIMEOUT_MS = 4000; // MyMemory API 개별 타임아웃
-const BATCH_TOTAL_BUDGET_MS = 7000; // translateBatch 전체 예산 (Vercel 10초 - yiwugo API ~2초)
+const API_TIMEOUT_MS = 2500; // MyMemory API 개별 타임아웃
+const BATCH_TOTAL_BUDGET_MS = 4500; // translateBatch 전체 예산 (Vercel 10초 - yiwugo API 2초 - 버퍼)
 const CACHE_REVALIDATE_SECONDS = 86400 * 7; // 7일
 
 // ─── 인메모리 캐시 ──────────────────────────────────

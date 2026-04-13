@@ -50,15 +50,46 @@ async function getToken(): Promise<string> {
 
 /**
  * Generic GET request with OAuth token in query params
+ *
+ * Next.js fetch()를 사용하여 Vercel Data Cache 활용:
+ * - 같은 URL은 revalidateSeconds 동안 CDN 캐시에서 즉시 반환
+ * - yiwugo API의 느린 응답(중국 서버) 문제 해결
+ * - Cold start에도 캐시 유지
+ *
+ * 캐시 주기:
+ * - 상품 검색/리스트: 5분 (트래픽 많으므로 캐시 히트율 높음)
+ * - 상품 상세: 10분 (가격/재고 변동 가능성)
+ * - 카테고리/마켓: 1시간 (거의 불변)
  */
-async function apiGet(path: string, params: Record<string, string> = {}): Promise<any> {
+async function apiGet(
+  path: string,
+  params: Record<string, string> = {},
+  revalidateSeconds = 300,
+): Promise<any> {
   const token = await getToken();
-  const response = await axios.get(`${API_BASE}${path}`, {
-    params: { ...params, access_token: token },
-    timeout: 15000,
-    headers: { Accept: 'application/json', 'User-Agent': UA },
-  });
-  return response.data;
+
+  // 쿼리스트링 수동 구성 (fetch는 params 옵션이 없음)
+  const qs = new URLSearchParams({ ...params, access_token: token }).toString();
+  const url = `${API_BASE}${path}?${qs}`;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: { Accept: 'application/json', 'User-Agent': UA },
+      // Next.js Data Cache: 같은 URL은 revalidateSeconds 동안 캐시
+      next: { revalidate: revalidateSeconds, tags: ['yiwugo'] },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Yiwugo API error: ${response.status}`);
+    }
+    return await response.json();
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 /**
@@ -98,34 +129,29 @@ export async function searchShops(params: {
   if (params.subMarket) query.subMarket = params.subMarket;
   if (params.subFloor) query.subFloor = params.subFloor;
 
-  const data = await apiGet('/open/cn_shop/list', query);
+  const data = await apiGet('/open/cn_shop/list', query, 600);
   return { total: data?.data?.num ?? 0, shops: data?.data?.list ?? [] };
 }
 
 /**
  * GET /open/cn_shop/detail - Shop detail
- * Params: shopId (required)
+ * 상점 상세는 10분 캐시
  */
 export async function getShopDetail(shopId: string) {
-  const data = await apiGet('/open/cn_shop/detail', { shopId });
+  const data = await apiGet('/open/cn_shop/detail', { shopId }, 600);
   return data?.data ?? null;
 }
 
 /**
  * GET /open/cn_shop/shopCategorizeNum - Shop internal category counts
- * Params: shopId (required)
- * Response: data.typeProducts[] — { defineType, productNums }
  */
 export async function getShopCategorizeNum(shopId: string) {
-  const data = await apiGet('/open/cn_shop/shopCategorizeNum', { shopId });
+  const data = await apiGet('/open/cn_shop/shopCategorizeNum', { shopId }, 600);
   return data?.data ?? { typeProducts: [] };
 }
 
 /**
  * GET /open/cn_shop/shopSearch - Shop internal product search
- * Params: shopId, productLable, dt, st (sort), keyword, cpage, pagesize
- *   st: 1=newest, 9=sales, 4=priceAsc, 3=priceDesc
- * Response: data.{ pageSize, shopName, productdetaillist[], totalCount }
  */
 export async function searchShopProducts(params: {
   shopId: string; keyword?: string; productLable?: string;
@@ -139,7 +165,7 @@ export async function searchShopProducts(params: {
   if (params.cpage) query.cpage = String(params.cpage);
   if (params.pagesize) query.pagesize = String(params.pagesize);
 
-  const data = await apiGet('/open/cn_shop/shopSearch', query);
+  const data = await apiGet('/open/cn_shop/shopSearch', query, 300);
   return {
     shopName: data?.data?.shopName ?? '',
     pageSize: data?.data?.pageSize ?? 10,
@@ -181,7 +207,8 @@ export async function searchProducts(params: {
   if (params.goodLabelFlag) query.goodLabelFlag = params.goodLabelFlag;
   if (params.onlineOrderFlag) query.onlineOrderFlag = params.onlineOrderFlag;
 
-  const data = await apiGet('/open/cn_product/list', query);
+  // 상품 검색 결과는 5분 캐시 (자주 변함)
+  const data = await apiGet('/open/cn_product/list', query, 300);
   return {
     total: data?.data?.numfound ?? 0,
     products: data?.data?.prslist ?? [],
@@ -194,9 +221,10 @@ export async function searchProducts(params: {
 /**
  * GET /open/cn_product/detail - Product detail
  * Params: productId (required)
+ * 상품 상세는 10분 캐시 (가격/재고 변동 반영)
  */
 export async function getProductDetail(productId: string) {
-  const data = await apiGet('/open/cn_product/detail', { productId: productId });
+  const data = await apiGet('/open/cn_product/detail', { productId: productId }, 600);
   return data?.data ?? null;
 }
 
@@ -204,23 +232,22 @@ export async function getProductDetail(productId: string) {
 
 /**
  * GET /open/categorize/product - Product categories
- * Params: upperType (optional), webType: cn/en (required)
- * Response: data.list[]
+ * 카테고리는 1시간 캐시 (거의 불변)
  */
 export async function getCategories(upperType?: string, webType: string = 'cn') {
   const query: Record<string, string> = { webType };
   if (upperType) query.upperType = upperType;
 
-  const data = await apiGet('/open/categorize/product', query);
+  const data = await apiGet('/open/categorize/product', query, 3600);
   return data?.data?.list ?? [];
 }
 
 /**
  * GET /open/categorize/market - Market classification list
- * Response: data.{ marketList[]: { marketEnName, marketCode } }
+ * 마켓 정보는 1시간 캐시
  */
 export async function getMarkets() {
-  const data = await apiGet('/open/categorize/market', {});
+  const data = await apiGet('/open/categorize/market', {}, 3600);
   return data?.data?.marketList ?? [];
 }
 
