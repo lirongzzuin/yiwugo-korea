@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as yiwugo from '../../../../lib/yiwugo-server';
 import { normalizeImageUrl } from '../../../../lib/yiwugo-server';
 import { translateBatch } from '../../../../lib/translation-service';
+import { applyGlossary } from '../../../../lib/translation-glossary';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 10; // Vercel Hobby 플랜 최대치
 
 async function getExchangeRate(): Promise<number> {
   try {
@@ -21,14 +23,36 @@ async function getExchangeRate(): Promise<number> {
   return 219;
 }
 
+/**
+ * 번역이 실패하더라도 원문을 반환하는 안전한 래퍼
+ */
+async function safeTranslateBatch(texts: string[]): Promise<string[]> {
+  try {
+    const results = await translateBatch(texts);
+    // 결과 개수가 맞지 않으면 원문 + 글로사리로 보완
+    if (results.length !== texts.length) {
+      return texts.map((t, i) => results[i] ?? applyGlossary(t));
+    }
+    return results;
+  } catch {
+    // 완전 실패 시에도 글로사리 폴백
+    return texts.map((t) => applyGlossary(t));
+  }
+}
+
 export async function GET(
   _request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const productId = params.id;
+
   try {
-    const productId = params.id;
+    // 이우고 API 호출과 환율을 병렬로
     const [data, rate] = await Promise.all([
-      yiwugo.getProductDetail(productId),
+      yiwugo.getProductDetail(productId).catch((err) => {
+        console.error('[products/[id]] yiwugo error:', err);
+        return null;
+      }),
       getExchangeRate(),
     ]);
 
@@ -44,28 +68,26 @@ export async function GET(
     const shopInfo = data.shopinfo?.shop || {};
     const shopBooth = data.shopinfo?.shopbooth || {};
 
-    // Title from productDetailVO
     const rawTitle = vo.title || data.title || '';
     const rawShopName = shopInfo.shopName || '';
     const rawMarketInfo = shopBooth.newMarketInfo || shopBooth.marketInfo || shopInfo.marketInfo || '';
 
-    // Price: totalprice in 元(CNY). If 0, try sellPrice from vo (in 分) or unitprice
+    // Price
     let priceCny = parseFloat(data.totalprice || '0');
     if (priceCny === 0 && data.unitprice) {
       priceCny = parseFloat(data.unitprice);
     }
     if (priceCny === 0 && vo.sellPrice) {
-      priceCny = Number(vo.sellPrice) / 100; // sellPrice in 分(cents)
+      priceCny = Number(vo.sellPrice) / 100;
     }
     const priceKrw = Math.round(priceCny * rate);
 
-    // Collect images from detail.sdiProductsPicList
+    // Images
     const images: string[] = [];
     const addImage = (url: string) => {
       const normalized = normalizeImageUrl(url);
       if (normalized && !images.includes(normalized)) images.push(normalized);
     };
-
     const picList = detailInner.sdiProductsPicList || [];
     picList.forEach((pic: any) => {
       if (pic.picture1) addImage(pic.picture1);
@@ -105,40 +127,38 @@ export async function GET(
       });
     }
 
-    // ─── 서버사이드 일괄 번역 ────────────────────────────
-    // 모든 텍스트를 한 번에 배치 번역 (캐시 + 글로사리 + API)
+    // ─── 서버사이드 안전 번역 ───────────────────────────
     const textsToTranslate: string[] = [
-      rawTitle,                                           // [0]
-      rawShopName,                                        // [1]
-      rawMarketInfo,                                      // [2]
-      ...rawSkuOptions.map((s: any) => s.name),           // [3 ~ 3+skuCount-1]
-      ...Object.keys(rawSpecs),                           // spec keys
-      ...Object.values(rawSpecs),                         // spec values
-    ].filter(Boolean);
+      rawTitle,
+      rawShopName,
+      rawMarketInfo,
+      ...rawSkuOptions.map((s: any) => s.name),
+      ...Object.keys(rawSpecs),
+      ...Object.values(rawSpecs),
+    ];
 
-    const translatedTexts = await translateBatch(textsToTranslate);
+    const translatedTexts = await safeTranslateBatch(textsToTranslate);
 
-    // 번역 결과 분배
     let idx = 0;
-    const title = translatedTexts[idx++] || rawTitle;
-    const shopName = translatedTexts[idx++] || rawShopName;
-    const marketInfo = translatedTexts[idx++] || rawMarketInfo;
+    const title = translatedTexts[idx++] || applyGlossary(rawTitle);
+    const shopName = translatedTexts[idx++] || applyGlossary(rawShopName);
+    const marketInfo = translatedTexts[idx++] || applyGlossary(rawMarketInfo);
 
     const skuOptions = rawSkuOptions.map((s: any) => ({
       ...s,
-      name: translatedTexts[idx++] || s.name,
+      name: translatedTexts[idx++] || applyGlossary(s.name),
     }));
 
     const specKeys = Object.keys(rawSpecs);
     const translatedSpecKeys: string[] = [];
     for (let i = 0; i < specKeys.length; i++) {
-      translatedSpecKeys.push(translatedTexts[idx++] || specKeys[i]);
+      translatedSpecKeys.push(translatedTexts[idx++] || applyGlossary(specKeys[i]));
     }
 
     const specifications: Record<string, string> = {};
     specKeys.forEach((origKey, i) => {
       const translatedKey = translatedSpecKeys[i];
-      const translatedValue = translatedTexts[idx++] || rawSpecs[origKey];
+      const translatedValue = translatedTexts[idx++] || applyGlossary(rawSpecs[origKey]);
       specifications[translatedKey] = translatedValue;
     });
 

@@ -3,6 +3,7 @@ import * as yiwugo from '../../../../lib/yiwugo-server';
 import { mapProductsAsync } from '../../utils';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 10;
 
 const OVERSEAS_PAYMENT_FEE_RATE = 0.015;
 
