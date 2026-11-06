@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/cn';
 import { loadTossPayments, TossPaymentsWidgets } from '@tosspayments/tosspayments-sdk';
 
-const TOSS_CLIENT_KEY = process.env.NEXT_PUBLIC_TOSS_PAYMENTS_CLIENT_KEY || 'test_ck_your_client_key';
+const TOSS_CLIENT_KEY = process.env.NEXT_PUBLIC_TOSS_PAYMENTS_CLIENT_KEY || '';
 
 const MOCK_ITEMS = [
   {

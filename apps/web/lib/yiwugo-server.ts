@@ -4,7 +4,7 @@ import axios from 'axios';
 let cachedToken: { token: string; expiresAt: number } | null = null;
 
 const API_BASE = process.env.YIWUGO_API_BASE_URL || 'https://open.yiwugo.com';
-// Test credentials from Yiwugo Open Platform (override via env vars on production)
+// Yiwugo Open Platform credentials (set via env vars)
 const CLIENT_ID = process.env.YIWUGO_CLIENT_ID || '';
 const CLIENT_SECRET = process.env.YIWUGO_CLIENT_SECRET || '';
 
